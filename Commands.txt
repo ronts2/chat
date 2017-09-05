@@ -1,0 +1,11 @@
+All the server's commands structures (without prefix):
+
+whisper <name> <content> -Sends a private message to a user
+kick <name> -Kicks a user from the server
+mute <name> -Mutes a user
+unmute <name> -Unmutes a user
+promote <name> -Promotes a user to an admin
+demote <name> -Demotes a user to a regular
+view_commands -Sends a private message to the sender with the commands they are allowed to use
+view_admins -Sends a private message to the sender which contains a list of the admins on the server
+quit - disconnects the user from the server
