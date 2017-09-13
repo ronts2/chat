@@ -2,18 +2,18 @@
 This module contains the server (main script for the server host)
 The server follows the communication protocol: send size of data - then the data itself
 """
-import socket
 import select
-from time import sleep
+import socket
 
+import jsonpickle as pickle
+
+from essentials import messages, file_handler
 from server_utils import commands
-from server_utils.user import User
 
 ADDRESS = socket.gethostbyname(socket.gethostname())
 PORT = 9900
-MSG_LEN_SIZE = 4
+MSG_LEN_SIZE = 6
 MAX_CONNECTIONS = 5
-IDLE_TIME = 0.1
 
 
 class Server(object):
@@ -28,7 +28,15 @@ class Server(object):
         self.server = self.create_socket()
         self.users_by_nick = dict()
         self.users_by_client = dict()
+        self.downloads = dict()
         self._init_messages()
+        # flags
+        self.request_flag = 'req'
+        self.connection_flag = 'con'
+        # request flags
+        self.file_flag = 'file'
+        # connection flags
+        self.close_flag = 'close'
 
     def _init_messages(self):
         self.connect_message = '{} connected'
@@ -46,6 +54,13 @@ class Server(object):
         self.promote_message = 'You are now an admin.'
         self.demote_message = 'You are now a regular.'
         self.user_not_found = 'User {} not found.'
+
+    def build_protocol(self, *args, **kwargs):
+        """
+        Build a request string.
+        :return: request string.
+        """
+        return ':'.join(('.'.join(kwargs['flags']),  kwargs['path']))
 
     # Socket
     def create_socket(self):
@@ -65,10 +80,9 @@ class Server(object):
         Proceeds to process them
         """
         while True:
-            inputs, outputs = self.get_client_list() + [self.server], []
-            readable, writable, exceptional = select.select(inputs, outputs, inputs)
+            inputs = self.get_client_list() + [self.server]
+            readable, writable, exceptional = select.select(inputs, [], [])
             self.handle_inputs(readable)
-            sleep(IDLE_TIME)
 
     def get_client_list(self):
         return self.users_by_client.keys()
@@ -79,8 +93,9 @@ class Server(object):
         :param readable: list of inputs
         """
         for sock in readable:
-            if sock is self.server and len(self.users_by_nick) < MAX_CONNECTIONS:
-                self.accept_new_user(sock)
+            if sock is self.server:
+                if len(self.users_by_nick) < MAX_CONNECTIONS:
+                    self.accept_new_user(sock)
             else:
                 self.handle_client(self.users_by_client[sock])
 
@@ -96,7 +111,7 @@ class Server(object):
             data += client.recv(size-len(data))
         return data
 
-    def receive_data(self, client):
+    def receive(self, client):
         """
         Receives messages from the client
         :param client: the client socket
@@ -105,7 +120,8 @@ class Server(object):
         try:
             msg = self._receive_all(MSG_LEN_SIZE, client)
             size = int(msg)
-            return self._receive_all(size, client)
+            tmp = pickle.loads(self._receive_all(size, client))
+            return tmp
         except:
             return ''
 
@@ -115,11 +131,11 @@ class Server(object):
         :param sock: connection listener
         """
         client, address = sock.accept()
-        nickname = self.receive_data(client)
-        if nickname in self.users_by_nick:
-            self.direct_message(client, self.invalid_nick_message.format(nickname))
+        user = pickle.loads(self.receive(client).data)
+        user.client, user.address = client, address[0]
+        if user.nickname in self.users_by_nick:
+            self.direct_message(client, self.invalid_nick_message.format(user.nickname))
             return
-        user = User(nickname, client, address[0])
         self.process_new_user(user)
 
     def process_new_user(self, user):
@@ -141,6 +157,7 @@ class Server(object):
         user.connected = True
         self.users_by_nick[user.nickname] = user
         self.users_by_client[user.client] = user
+        self.downloads[user.nickname] = list()
 
     def remove_user(self, user):
         """
@@ -149,6 +166,7 @@ class Server(object):
         """
         del self.users_by_nick[user.nickname]
         del self.users_by_client[user.client]
+        del self.downloads[user.nickname]
 
     def close_client(self, client):
         """
@@ -163,7 +181,7 @@ class Server(object):
         Handles the client's needs
         :param user: the user to handle
         """
-        msg = self.receive_data(user.client)
+        msg = self.receive(user.client)
         if msg:
             self.handle_message(msg, user)
         elif user.connected:
@@ -197,9 +215,23 @@ class Server(object):
         """
         if user.muted:
             self.direct_message(user, self.muted_message)
+        elif msg.type == messages.REGULAR_MSG:
+            self.broadcast(user.display_name + ': ' + msg.data)
+            self.handle_command(user, msg.data)
         else:
-            self.broadcast(user.display_name + ': ' + msg)
-            self.handle_command(user, msg)
+            self.handle_protocol(msg, user)
+
+    def handle_protocol(self, msg, user):
+        """
+        Handles protocol messages.
+        :param msg: the user's message
+        :param user: the user who sent the message
+        """
+        if msg.type == messages.FILE_DATA_CHUNK:
+            self.downloads[user.nickname].append(msg.data)
+        elif msg.type == messages.FILE_DATA_FIN:
+            file_handler.create_file('dl/' + msg.data, ''.join(self.downloads[user.nickname]))
+            self.downloads[user.nickname] = list()
 
     def change_display_name(self, user, new_nick):
         """
@@ -232,8 +264,7 @@ class Server(object):
             pass
         user.connected = False
         self.close_client(user.client)
-        if not self.users_by_nick[user.nickname].connected:
-            self.remove_user(user)
+        self.remove_user(user)
 
     def direct_message(self, user, content):
         """

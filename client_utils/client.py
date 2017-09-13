@@ -4,12 +4,18 @@ The client follows the communication protocol: send size of data - then the data
 The client sends pickled Message 
 """
 import socket
+import jsonpickle as pickle
+from threading import Thread
+from time import sleep
 
-MSG_LEN_SIZE = 4  # The size of the length of a message
+from essentials import file_handler, messages
+
+MSG_LEN_SIZE = 6  # The size of the length of a message
 # the default server ip address - the current computer
 DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
 # the default server port - the programmer's choice
 DEF_SERVER_PORT = 9900
+DATA_CHUNK_SIZE = 1024
 
 
 class Client(object):
@@ -33,7 +39,7 @@ class Client(object):
         """
         self.client.connect((self.server_ip, self.port))
 
-    def receive_data(self):
+    def receive(self):
         """
         Gathers data sent from the server
         :return: message from the server or None if the server closed
@@ -57,6 +63,27 @@ class Client(object):
             return data
         except:
             return ''
+
+    def send_file(self, path):
+        """
+        Sends a file to the server.
+        :param path: a path to a file.
+        """
+        data_chunks = file_handler.generate_chunks(path, DATA_CHUNK_SIZE)
+        sender = Thread(target=self.send_chunks, args=[data_chunks, path])
+        sender.start()
+
+    def send_chunks(self, chunks, path):
+        for chunk in chunks:
+            self.send(pickle.dumps(messages.Message(messages.FILE_DATA_CHUNK, chunk)))
+            sleep(0.1)
+        self.send(pickle.dumps(messages.Message(messages.FILE_DATA_FIN, path)))
+
+    def send_obj(self, obj):
+        self.send_regular(pickle.dumps(obj))
+
+    def send_regular(self, data):
+        self.send(pickle.dumps(messages.Message(messages.REGULAR_MSG, data)))
 
     def send(self, msg):
         """

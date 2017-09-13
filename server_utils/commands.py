@@ -235,3 +235,14 @@ def demote_user(args_obj):
         server.change_display_name(target, target.display_name[1:])
         target.is_admin = False
         server.direct_message(target, server.demote_message)
+
+
+@Command.command('^send_file\s\w+.txt$', admin_only=True)
+def send_file(args_obj):
+    """
+    Downloads a file.
+    """
+    name = args_obj.args[1]
+    server = args_obj.server
+    request = server.build_protocol(flags=[server.request_flag, server.file_flag], path=name)
+    server.direct_message(args_obj.user, request)

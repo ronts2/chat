@@ -9,7 +9,7 @@ class User(object):
     It is used to determine the nickname of the user (displayed in chat), their client socket,
     their server status (administrator/regular) and whether the user is muted or not
     """
-    def __init__(self, nickname, client, address):
+    def __init__(self, nickname):
         """
         The class constructor
         :param nickname: the user's nickname
@@ -23,5 +23,5 @@ class User(object):
         self.is_admin = False
         self.muted = False
         self.connected = False
-        self.client = client
-        self.address = address
+        self.client = None
+        self.address = None

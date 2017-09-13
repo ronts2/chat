@@ -159,7 +159,7 @@ class GUI(object):
             self.disable_input()
         else:
             self.display_message('Connection established.')
-            self.enabel_input()
+            self.enable_input()
 
     def disable_input(self):
         """
@@ -170,7 +170,7 @@ class GUI(object):
         self.input_content.config(background=DISABLED_BG_COLOR)
         self.input_content_starter.config(background=DISABLED_BG_COLOR)
 
-    def enabel_input(self):
+    def enable_input(self):
         """
         Enables the user's ability to type input
         Changes the background color of the input field to the normal color
@@ -217,7 +217,7 @@ class GUI(object):
         text = self.input.get('0.0', END).strip()
         # cannot send only white space (pure spaces are the equivalent of an empty message)
         if text != '':
-            self.chat_client.client.send(text)
+            self.chat_client.client.send_regular(text)
         self.input.delete('0.0', END)
         self.update_char_counter()
         return "break"
