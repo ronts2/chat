@@ -15,7 +15,7 @@ MSG_LEN_SIZE = 6  # The size of the length of a message
 DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
 # the default server port - the programmer's choice
 DEF_SERVER_PORT = 9900
-DATA_CHUNK_SIZE = 1024
+DATA_CHUNK_SIZE = 4096
 
 
 class Client(object):
@@ -97,5 +97,8 @@ class Client(object):
         """
         Closes the socket
         """
-        self.client.shutdown(socket.SHUT_RDWR)  # Stop receiving/sending
+        try:
+            self.client.shutdown(socket.SHUT_RDWR)  # Stop receiving/sending
+        except:
+            pass
         self.client.close()

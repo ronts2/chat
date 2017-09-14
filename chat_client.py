@@ -6,20 +6,11 @@ import time
 from threading import Thread
 
 from client_utils import client, gui, user
-from essentials import file_handler
+from essentials import file_handler, protocols
 
 CLIENT_THREAD_TIMEOUT = 3
 GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
-# flags
-REQUEST = 'req'
-CONNECTION = 'con'
-
-# request flags
-FILE = 'file'
-
-# connection flags
-CLOSE = 'close'
 
 
 def get_nick():
@@ -41,7 +32,7 @@ class ChatClient(object):
         """
         self.client = client.Client()
         self.gui = gui.GUI(self)
-        self.protocols = {REQUEST: {FILE: self.client.send_file}, CONNECTION: {CLOSE: self.client.close}}
+        self.protocols = protocols.Protocol(file=self.client.send_file, close=self.client.close)
         self.downloads = dict()
 
     def wait_for_gui(self):
@@ -57,40 +48,13 @@ class ChatClient(object):
     def create_file(self, name):
         file_handler.create_file(name, ''.join(self.downloads[name]))
 
-    def check_protocol(self, text):
-        """Checks whether a string is a protocol message.
-        :param text: a string
-        :returns: True if the text is a protocol message, False otherwise.
-        """
-        components = text.split('.')
-        return components[0] in self.protocols
-
-    def _initiate_protocol(self, components, protocols):
-        """
-        Initiates protocols.
-        :param components: flag components of a protocol.
-        :return: the function corresponding to the protocol.
-        """
-        if len(components) == 1:
-            return protocols[components[0]]
-        return self._initiate_protocol(components[1:], protocols[components[0]])
-
-    def parse_protocol(self, msg):
-        """
-        Parses a protocol string.
-        :param msg: a protocol flags string.
-        """
-        protocol, data = msg.split(':')
-        func = self._initiate_protocol(protocol.split('.'), self.protocols)
-        func(data)
-
     def process_message(self, msg):
         """
         Processes messages sent by the server.
         :param msg: a message sent from the server.
         """
-        if self.check_protocol(msg):
-            self.parse_protocol(msg)
+        if self.protocols.check_protocol(msg):
+            self.protocols.initiate_protocol(msg)
             return
         message = ' '.join((time.strftime('%H:%M'), msg))
         self.gui.display_message(message)
@@ -99,7 +63,7 @@ class ChatClient(object):
         while True:
             message = self.client.receive()
             if not message:
-                return
+                break
             self.process_message(message)
 
     def initiate_conversation(self, nickname):

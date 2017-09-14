@@ -4,10 +4,9 @@ The server follows the communication protocol: send size of data - then the data
 """
 import select
 import socket
-
 import jsonpickle as pickle
 
-from essentials import messages, file_handler
+from essentials import messages, file_handler, protocols
 from server_utils import commands
 
 ADDRESS = socket.gethostbyname(socket.gethostname())
@@ -30,13 +29,7 @@ class Server(object):
         self.users_by_client = dict()
         self.downloads = dict()
         self._init_messages()
-        # flags
-        self.request_flag = 'req'
-        self.connection_flag = 'con'
-        # request flags
-        self.file_flag = 'file'
-        # connection flags
-        self.close_flag = 'close'
+        self.protocols = protocols.Protocol()
 
     def _init_messages(self):
         self.connect_message = '{} connected'
@@ -54,13 +47,9 @@ class Server(object):
         self.promote_message = 'You are now an admin.'
         self.demote_message = 'You are now a regular.'
         self.user_not_found = 'User {} not found.'
-
-    def build_protocol(self, *args, **kwargs):
-        """
-        Build a request string.
-        :return: request string.
-        """
-        return ':'.join(('.'.join(kwargs['flags']),  kwargs['path']))
+        self.upload_start_msg = '{} is being uploaded.'
+        self.already_uploading_msg = 'You can only upload one file at a time.'
+        self.upload_finished_msg = '{} has finished uploading!'
 
     # Socket
     def create_socket(self):
@@ -232,6 +221,7 @@ class Server(object):
         elif msg.type == messages.FILE_DATA_FIN:
             file_handler.create_file('dl/' + msg.data, ''.join(self.downloads[user.nickname]))
             self.downloads[user.nickname] = list()
+            self.broadcast(self.upload_finished_msg.format(msg.data))
 
     def change_display_name(self, user, new_nick):
         """
@@ -259,7 +249,8 @@ class Server(object):
         :param user: the user to disconnect
         """
         try:
-            self.direct_message(user, '')  # send an empty message - signaling the client socket is closing
+            self.direct_message(user, self.protocols.build_protocol(flags=[protocols.CONNECTION_FLAG,
+                                                                           protocols.CLOSE_CON]))
         except:
             pass
         user.connected = False

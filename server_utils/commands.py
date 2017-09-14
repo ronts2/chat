@@ -4,6 +4,8 @@ It contains the commands utility
 """
 import re
 
+from essentials import protocols
+
 PREFIX = '?'
 
 
@@ -237,12 +239,16 @@ def demote_user(args_obj):
         server.direct_message(target, server.demote_message)
 
 
-@Command.command('^send_file\s\w+.txt$', admin_only=True)
+@Command.command('^send_file\s\w+\.[a-z]+$', admin_only=True)
 def send_file(args_obj):
     """
     Downloads a file.
     """
-    name = args_obj.args[1]
     server = args_obj.server
-    request = server.build_protocol(flags=[server.request_flag, server.file_flag], path=name)
-    server.direct_message(args_obj.user, request)
+    user = args_obj.user
+    if server.downloads[user.nickname]:
+        server.direct_message(server.already_uploading_msg)
+    name = args_obj.args[1]
+    request = server.protocols.build_protocol([protocols.REQUEST_FLAG, protocols.FILE_REQ], name)
+    server.direct_message(user, request)
+    server.broadcast(server.upload_start_msg.format(name))
