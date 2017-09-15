@@ -5,12 +5,13 @@ import re
 import time
 from threading import Thread
 
-from client_utils import client, gui, user
+from client_utils import gui, user, clientsocket
 from essentials import file_handler, protocols
 
 CLIENT_THREAD_TIMEOUT = 3
 GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
+QUIT_MSG = '?quit'
 
 
 def get_nick():
@@ -23,17 +24,20 @@ def get_nick():
 
 class ChatClient(object):
     """
-    This class is the main client script
+    This class is the main chatsocket script
     It is used to run the application (with a GUI)
     """
     def __init__(self):
         """
         The class constructor
         """
-        self.client = client.Client()
+        self.client = clientsocket.ClientSocket()
         self.gui = gui.GUI(self)
-        self.protocols = protocols.Protocol(file=self.client.send_file, close=self.client.close)
+        self.protocols = protocols.Protocol(file=self.client.send_file, close=self.client.close_sock)
         self.downloads = dict()
+
+    def exit(self):
+        self.client.send_regular(QUIT_MSG)
 
     def wait_for_gui(self):
         while not self.gui.running:
@@ -57,10 +61,11 @@ class ChatClient(object):
             self.protocols.initiate_protocol(msg)
             return
         message = ' '.join((time.strftime('%H:%M'), msg))
-        self.gui.display_message(message)
+        if self.gui.running:
+            self.gui.display_message(message)
 
     def receive_messages(self):
-        while True:
+        while self.gui.running:
             message = self.client.receive()
             if not message:
                 break
@@ -69,7 +74,7 @@ class ChatClient(object):
     def initiate_conversation(self, nickname):
         self.wait_for_gui()
         try:
-            self.client.establish_connection()
+            self.client.connect()
         except:
             self.gui.display_connection_status(False)
             quit()
@@ -89,7 +94,6 @@ class ChatClient(object):
         client_thread.start()
         self.gui.start_gui('Chat - ' + nickname)
         client_thread.join(CLIENT_THREAD_TIMEOUT)
-        self.client.close()
 
 
 def main():

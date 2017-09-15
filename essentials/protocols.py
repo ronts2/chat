@@ -13,7 +13,7 @@ CLOSE_CON = 'close'
 
 
 class Protocol(object):
-    """This class is used to allow client-server communication behind the scenes."""
+    """This class is used to allow chatsocket-server communication behind the scenes."""
     def __init__(self, *args, **kwargs):
         """The class constructor."""
         self.protocols = {REQUEST_FLAG: {FILE_REQ: kwargs.get(FILE_REQ)},

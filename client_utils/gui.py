@@ -48,12 +48,12 @@ EXIT_POPUP_QUESTION = 'Are you sure you want to quit?'
 class GUI(object):
     """
     This class is used for the graphical interface
-    It is used by the chat client to display the chat
+    It is used by the chat chatsocket to display the chat
     """
     def __init__(self, chat_client):
         """
         The class constructor
-        :param chat_client: a chat client
+        :param chat_client: a chat chatsocket
         """
         self.running = False
         self.chat_client = chat_client
@@ -124,12 +124,11 @@ class GUI(object):
     def ask_quit_gui(self):
         """
         Asks the user whether to exit the GUI application or not
-        If the user answers yes, a quit command is sent to the server
         and closes the socket and gui
         """
         if tkmb.askokcancel(EXIT_POPUP_TITLE, EXIT_POPUP_QUESTION, icon=tkmb.QUESTION, parent=self.root):
             try:
-                self.chat_client.client.close()
+                self.chat_client.exit()
             except:
                 pass
             self.exit_gui()
@@ -237,6 +236,7 @@ class GUI(object):
 def main():
     g = GUI(None)
     g.start_gui()
+
 
 if __name__ == '__main__':
     main()

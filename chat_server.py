@@ -3,15 +3,11 @@ This module contains the server (main script for the server host)
 The server follows the communication protocol: send size of data - then the data itself
 """
 import select
-import socket
 import jsonpickle as pickle
 
-from essentials import messages, file_handler, protocols
-from server_utils import commands
+from essentials import messages, file_handler, protocols, chatsocket
+from server_utils import commands, serversocket
 
-ADDRESS = socket.gethostbyname(socket.gethostname())
-PORT = 9900
-MSG_LEN_SIZE = 6
 MAX_CONNECTIONS = 5
 
 
@@ -24,7 +20,7 @@ class Server(object):
         """
         The class constructor
         """
-        self.server = self.create_socket()
+        self.server = serversocket.ServerSocket()
         self.users_by_nick = dict()
         self.users_by_client = dict()
         self.downloads = dict()
@@ -51,23 +47,14 @@ class Server(object):
         self.already_uploading_msg = 'You can only upload one file at a time.'
         self.upload_finished_msg = '{} has finished uploading!'
 
-    # Socket
-    def create_socket(self):
-        """
-        Generates a server socket
-        :return: server socket
-        """
-        server = socket.socket()
-        server.bind((ADDRESS, PORT))
-        server.listen(MAX_CONNECTIONS)
-        return server
-
     # Server utilities
     def start_server(self):
         """
         Starts the server -> polls the network for incoming connections/messages
         Proceeds to process them
         """
+        print 'IP:', self.server.server_ip, 'Port:', self.server.port
+        self.server.initialize_server_socket()
         while True:
             inputs = self.get_client_list() + [self.server]
             readable, writable, exceptional = select.select(inputs, [], [])
@@ -88,42 +75,17 @@ class Server(object):
             else:
                 self.handle_client(self.users_by_client[sock])
 
-    def _receive_all(self, size, client):
-        """
-        Gathers data sent from the client until all data is received
-        :param size: the size of the data
-        :param client: the client
-        :return: received data
-        """
-        data = client.recv(size)
-        while len(data) < size:
-            data += client.recv(size-len(data))
-        return data
-
-    def receive(self, client):
-        """
-        Receives messages from the client
-        :param client: the client socket
-        :return: message object
-        """
-        try:
-            msg = self._receive_all(MSG_LEN_SIZE, client)
-            size = int(msg)
-            tmp = pickle.loads(self._receive_all(size, client))
-            return tmp
-        except:
-            return ''
-
     def accept_new_user(self, sock):
         """
-        Accepts the client socket connection and creates a User object
+        Accepts the chatsocket socket connection and creates a User object
         :param sock: connection listener
         """
         client, address = sock.accept()
-        user = pickle.loads(self.receive(client).data)
+        client = chatsocket.ChatSocket(_sock=client)
+        user = pickle.loads(client.receive_obj().data)
         user.client, user.address = client, address[0]
         if user.nickname in self.users_by_nick:
-            self.direct_message(client, self.invalid_nick_message.format(user.nickname))
+            client.send_str(self.invalid_nick_message.format(user.nickname))
             return
         self.process_new_user(user)
 
@@ -134,7 +96,7 @@ class Server(object):
         """
         self.add_user(user)
         # The host is the owner (Admin) of the server
-        if user.address == ADDRESS:
+        if user.address == self.server.server_ip:
             commands.promote_user(commands.CommandArgs(self, user, ''))
         self.broadcast(self.connect_message.format(user.display_name))
 
@@ -157,20 +119,13 @@ class Server(object):
         del self.users_by_client[user.client]
         del self.downloads[user.nickname]
 
-    def close_client(self, client):
-        """
-        Closes the client socket
-        """
-        client.shutdown(socket.SHUT_RDWR)  # Stop receiving/sending
-        client.close()
-
     # Server logic
     def handle_client(self, user):
         """
-        Handles the client's needs
+        Handles the chatsocket's needs
         :param user: the user to handle
         """
-        msg = self.receive(user.client)
+        msg = user.client.receive_obj()
         if msg:
             self.handle_message(msg, user)
         elif user.connected:
@@ -183,7 +138,7 @@ class Server(object):
             if self.check_permission(user, command):
                 command(commands.CommandArgs(self, user, message))
             else:
-                self.direct_message(user, self.no_permission_message)
+                user.client.send_str(self.no_permission_message)
 
     def check_permission(self, user, command):
         """
@@ -203,7 +158,7 @@ class Server(object):
         :param user: the user who sent the message
         """
         if user.muted:
-            self.direct_message(user, self.muted_message)
+            user.client.send_str(self.muted_message)
         elif msg.type == messages.REGULAR_MSG:
             self.broadcast(user.display_name + ': ' + msg.data)
             self.handle_command(user, msg.data)
@@ -239,7 +194,7 @@ class Server(object):
         """
         for nick, user in self.users_by_nick.iteritems():
             try:
-                self.direct_message(user, content)
+                user.client.send_str(content)
             except:
                 pass
 
@@ -249,28 +204,20 @@ class Server(object):
         :param user: the user to disconnect
         """
         try:
-            self.direct_message(user, self.protocols.build_protocol(flags=[protocols.CONNECTION_FLAG,
-                                                                           protocols.CLOSE_CON]))
+            user.client.send_str(self.protocols.build_protocol(flags=[protocols.CONNECTION_FLAG,
+                                                                      protocols.CLOSE_CON]))
         except:
             pass
         user.connected = False
-        self.close_client(user.client)
+        user.client.close_sock()
         self.remove_user(user)
-
-    def direct_message(self, user, content):
-        """
-        Send a message to a user
-        :param user: the user to direct_message to
-        :param content: the content to be whispered
-        """
-        user.client.sendall(str(len(content)).zfill(MSG_LEN_SIZE))
-        user.client.sendall(content)
 
 
 def main():
     s = Server()
     s.start_server()
-    s.server.close()
+    s.server.close_sock()
+
 
 if __name__ == '__main__':
     main()
