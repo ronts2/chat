@@ -1,15 +1,17 @@
 """
 This module contains the chat client (main script for users)
 """
+import re
 import time
 from threading import Thread
-import re
 
-from client_utils import client, gui
+from client_utils import gui, user
+from essentials import file_handler, protocols, chatsocket
 
 CLIENT_THREAD_TIMEOUT = 3
-GUI_WAIT_TIME = 0.5  # seconds to wait while the gui is initializing
+GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
+QUIT_MSG = '?quit'
 
 
 def get_nick():
@@ -22,36 +24,73 @@ def get_nick():
 
 class ChatClient(object):
     """
-    This class is the main client script
+    This class is the main chatsocket script
     It is used to run the application (with a GUI)
     """
     def __init__(self):
         """
         The class constructor
         """
-        self.client = client.Client()
+        self.client = chatsocket.ChatSocket()
         self.gui = gui.GUI(self)
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file,
+                                            self.download_file, self.create_file, self.request_file)
+        self.downloads = list()
+
+    def exit(self):
+        self.client.send_regular_msg(QUIT_MSG)
+
+    def close(self, **kwargs):
+        self.client.close_sock()
 
     def wait_for_gui(self):
         while not self.gui.running:
             time.sleep(GUI_WAIT_TIME)
 
-    def receive_messages(self):
-        message = self.client.receive_data()
-        while message:
-            message = ' '.join((time.strftime('%H:%M'), message))
+    def request_file(self, name, **kwargs):
+        """
+        Requests a file from the server.
+        :param name: the file's name
+        """
+        self.client.send_msg(protocols.build_header(protocols.REQUEST_FILE, name), '')
+
+    def send_file(self, path, **kwargs):
+        self.client.send_file(path)
+
+    def download_file(self,  msg):
+        if msg.data:
+            self.downloads.append(msg.data)
+        else:
+            self.downloads = list()
+
+    def create_file(self, name, **kwargs):
+        file_handler.create_file('client_dl/' + name, ''.join(self.downloads))
+
+    def handle_regular_msg(self, msg):
+        """
+        Handles regular-type messages.
+        :param msg: a message.
+        """
+        message = ' '.join((time.strftime('%H:%M'), msg.data))
+        if self.gui.running:
             self.gui.display_message(message)
-            message = self.client.receive_data()
+
+    def receive_messages(self):
+        while self.client.open:
+            message = self.client.receive_obj()
+            if not message:
+                return
+            self.protocols.initiate_protocol(message.header, msg=message)
 
     def initiate_conversation(self, nickname):
         self.wait_for_gui()
         try:
-            self.client.establish_connection()
+            self.client.connect()
         except:
             self.gui.display_connection_status(False)
             quit()
         self.gui.display_connection_status(True)
-        self.client.send(nickname)
+        self.client.send_obj(user.User(nickname))
         self.receive_messages()
         if self.gui.running:
             self.gui.display_connection_status(False)
@@ -71,6 +110,7 @@ class ChatClient(object):
 def main():
     chat_client = ChatClient()
     chat_client.start_client()
+
 
 if __name__ == '__main__':
     main()

@@ -48,12 +48,12 @@ EXIT_POPUP_QUESTION = 'Are you sure you want to quit?'
 class GUI(object):
     """
     This class is used for the graphical interface
-    It is used by the chat client to display the chat
+    It is used by the chat chatsocket to display the chat
     """
     def __init__(self, chat_client):
         """
         The class constructor
-        :param chat_client: a chat client
+        :param chat_client: a chat chatsocket
         """
         self.running = False
         self.chat_client = chat_client
@@ -124,12 +124,11 @@ class GUI(object):
     def ask_quit_gui(self):
         """
         Asks the user whether to exit the GUI application or not
-        If the user answers yes, a quit command is sent to the server
         and closes the socket and gui
         """
         if tkmb.askokcancel(EXIT_POPUP_TITLE, EXIT_POPUP_QUESTION, icon=tkmb.QUESTION, parent=self.root):
             try:
-                self.chat_client.client.close()
+                self.chat_client.exit()
             except:
                 pass
             self.exit_gui()
@@ -159,7 +158,7 @@ class GUI(object):
             self.disable_input()
         else:
             self.display_message('Connection established.')
-            self.enabel_input()
+            self.enable_input()
 
     def disable_input(self):
         """
@@ -170,7 +169,7 @@ class GUI(object):
         self.input_content.config(background=DISABLED_BG_COLOR)
         self.input_content_starter.config(background=DISABLED_BG_COLOR)
 
-    def enabel_input(self):
+    def enable_input(self):
         """
         Enables the user's ability to type input
         Changes the background color of the input field to the normal color
@@ -217,7 +216,7 @@ class GUI(object):
         text = self.input.get('0.0', END).strip()
         # cannot send only white space (pure spaces are the equivalent of an empty message)
         if text != '':
-            self.chat_client.client.send(text)
+            self.chat_client.client.send_regular_msg(text)
         self.input.delete('0.0', END)
         self.update_char_counter()
         return "break"
@@ -237,6 +236,7 @@ class GUI(object):
 def main():
     g = GUI(None)
     g.start_gui()
+
 
 if __name__ == '__main__':
     main()

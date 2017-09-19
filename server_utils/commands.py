@@ -4,6 +4,8 @@ It contains the commands utility
 """
 import re
 
+from essentials import protocols
+
 PREFIX = '?'
 
 
@@ -94,7 +96,7 @@ class CommandArgs(object):
         """
         target = self.server.users_by_nick.get(name)
         if not target:
-            self.server.direct_message(self.user, self.server.user_not_found.format(name))
+            self.user.client.send_regular_msg(self.server.user_not_found.format(name))
         return target
 
     @property
@@ -128,7 +130,7 @@ def view_commands(args_obj):
     server = args_obj.server
     user = args_obj.user
     cmds = ', '.join((cmd.name for cmd in Command.commands if not cmd.admin_only or user.is_admin))
-    server.direct_message(user, server.commands_message.format(cmds))
+    user.client.send_regular_msg(server.commands_message.format(cmds))
 
 
 @Command.command('^(view_admins)$')
@@ -138,7 +140,7 @@ def view_admins(args_obj):
     """
     server = args_obj.server
     admins = ', '.join(nick for nick, user in server.users_by_nick.iteritems() if user.is_admin)
-    server.direct_message(args_obj.user, server.admins_message.format(admins))
+    args_obj.user.client.send_regular_msg(server.admins_message.format(admins))
 
 
 @Command.command('^(whisper)\s@?\w+\s.+')
@@ -150,14 +152,14 @@ def whisper(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
     content = ' '.join(args_obj.args[2:])
-    server.direct_message(target, server.whisper_message.format(user.display_name, content))
+    target.client.send_regular_msg(server.whisper_message.format(user.display_name, content))
 
 
 @Command.command('^(kick)\s@?\w+$', admin_only=True)
-def kick_user(args_obj):
+def kick(args_obj):
     """
     Kicks the user from the server
     """
@@ -165,15 +167,15 @@ def kick_user(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
-    server.direct_message(target, server.kick_message_whisper)
+    target.client.send_regular_msg(server.kick_message_whisper)
     server.disconnect_user(target)
     server.broadcast(server.kick_message_all.format(target.nickname))
 
 
 @Command.command('^(mute)\s@?\w+$', admin_only=True)
-def mute_user(args_obj):
+def mute(args_obj):
     """
     Mutes the user
     """
@@ -181,14 +183,14 @@ def mute_user(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
     target.muted = True
-    server.direct_message(target, server.mute_message)
+    target.client.send_regular_msg(server.mute_message)
 
 
 @Command.command('^(unmute)\s@?\w+$', admin_only=True)
-def unmute_user(args_obj):
+def unmute(args_obj):
     """
     Unmutes the user
     """
@@ -196,15 +198,15 @@ def unmute_user(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.muted:
         target.muted = False
-        server.direct_message(target, server.unmute_message)
+        target.client.send_regular_msg(server.unmute_message)
 
 
 @Command.command('^(promote)\s@?\w+$', admin_only=True)
-def promote_user(args_obj):
+def promote(args_obj):
     """
     Promotes a user to admin
     """
@@ -212,16 +214,16 @@ def promote_user(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if not target.is_admin:
         target.is_admin = True
         server.change_display_name(target, '@' + target.display_name)
-        server.direct_message(target, server.promote_message)
+        target.client.send_regular_msg(server.promote_message)
 
 
 @Command.command('^(demote)\s@?\w+$', admin_only=True)
-def demote_user(args_obj):
+def demote(args_obj):
     """
     Demotes the user to regular
     """
@@ -229,9 +231,24 @@ def demote_user(args_obj):
     user = args_obj.user
     target = args_obj.target
     if not target:
-        server.direct_message(user, server.user_not_found.format(target))
+        user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.is_admin:
         server.change_display_name(target, target.display_name[1:])
         target.is_admin = False
-        server.direct_message(target, server.demote_message)
+        target.client.send_regular_msg(server.demote_message)
+
+
+@Command.command('^send_file\ \S+\.\S+$', admin_only=True)
+def send_file(args_obj):
+    """
+    Downloads a file.
+    """
+    server = args_obj.server
+    user = args_obj.user
+    if server.downloads[user.nickname]:
+        user.client.send_regular_msg(server.already_uploading_msg)
+    name = args_obj.args[1]
+    request = protocols.build_header(protocols.REQUEST_FILE, name)
+    user.client.send_msg(request, '')
+    server.broadcast(server.upload_start_msg.format(name))
