@@ -5,8 +5,8 @@ import re
 import time
 from threading import Thread
 
-from client_utils import gui, user, clientsocket
-from essentials import file_handler, protocols
+from client_utils import gui, user
+from essentials import file_handler, protocols, chatsocket
 
 CLIENT_THREAD_TIMEOUT = 3
 GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
@@ -31,45 +31,56 @@ class ChatClient(object):
         """
         The class constructor
         """
-        self.client = clientsocket.ClientSocket()
+        self.client = chatsocket.ChatSocket()
         self.gui = gui.GUI(self)
-        self.protocols = protocols.Protocol(file=self.client.send_file, close=self.client.close_sock)
-        self.downloads = dict()
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file,
+                                            self.download_file, self.create_file, self.request_file)
+        self.downloads = list()
 
     def exit(self):
-        self.client.send_regular(QUIT_MSG)
+        self.client.send_regular_msg(QUIT_MSG)
+
+    def close(self, **kwargs):
+        self.client.close_sock()
 
     def wait_for_gui(self):
         while not self.gui.running:
             time.sleep(GUI_WAIT_TIME)
 
-    def download_file(self, name, data=None):
-        if data:
-            self.downloads[name].append(data)
+    def request_file(self, name, **kwargs):
+        """
+        Requests a file from the server.
+        :param name: the file's name
+        """
+        self.client.send_msg(protocols.build_header(protocols.REQUEST_FILE, name), '')
+
+    def send_file(self, path, **kwargs):
+        self.client.send_file(path)
+
+    def download_file(self,  msg):
+        if msg.data:
+            self.downloads.append(msg.data)
         else:
-            self.downloads[name] = list()
+            self.downloads = list()
 
-    def create_file(self, name):
-        file_handler.create_file(name, ''.join(self.downloads[name]))
+    def create_file(self, name, **kwargs):
+        file_handler.create_file('client_dl/' + name, ''.join(self.downloads))
 
-    def process_message(self, msg):
+    def handle_regular_msg(self, msg):
         """
-        Processes messages sent by the server.
-        :param msg: a message sent from the server.
+        Handles regular-type messages.
+        :param msg: a message.
         """
-        if self.protocols.check_protocol(msg):
-            self.protocols.initiate_protocol(msg)
-            return
-        message = ' '.join((time.strftime('%H:%M'), msg))
+        message = ' '.join((time.strftime('%H:%M'), msg.data))
         if self.gui.running:
             self.gui.display_message(message)
 
     def receive_messages(self):
-        while self.gui.running:
-            message = self.client.receive()
+        while self.client.open:
+            message = self.client.receive_obj()
             if not message:
-                break
-            self.process_message(message)
+                return
+            self.protocols.initiate_protocol(message.header, msg=message)
 
     def initiate_conversation(self, nickname):
         self.wait_for_gui()

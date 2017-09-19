@@ -5,10 +5,10 @@ The ChatClient follows the communication protocol: send size of data - then the 
 import socket
 import jsonpickle as pickle
 from threading import Thread
-from time import sleep
 
 import file_handler
 import messages
+import protocols
 
 MSG_LEN_SIZE = 6  # The size of the length of a message
 # the default server ip address - the current computer
@@ -25,7 +25,7 @@ class ChatSocket(socket.socket):
     The chat socket contains the chat socket socket and the server's info
     """
     def __init__(self, server_ip=DEF_SERVER_IP, port=DEF_SERVER_PORT, msg_len_size=MSG_LEN_SIZE,
-                 data_chunk_size=DEF_DATA_CHUNK_SIZE, _sock=None):
+                 data_chunk_size=DEF_DATA_CHUNK_SIZE, listen=DEF_LISTEN, _sock=None):
         """
         The class constructor.
         :param server_ip: IP of the server.
@@ -37,13 +37,31 @@ class ChatSocket(socket.socket):
         self.server_ip = server_ip
         self.msg_len_size = msg_len_size
         self.data_chunk_size = data_chunk_size
+        self.listen = listen
         if _sock:
             super(ChatSocket, self).__init__(_sock=_sock)
         else:
             super(ChatSocket, self).__init__()
+        self.open = False
 
-    def fileno(self):
-        return super(ChatSocket, self).fileno()
+    def connect(self):
+        super(ChatSocket, self).connect((self.server_ip, self.port))
+        self.open = True
+
+    def initialize_server_socket(self):
+        """
+        Initializes the server socket.
+        """
+        self.bind((self.server_ip, self.port))
+        super(ChatSocket, self).listen(self.listen)
+
+    def accept(self):
+        """
+        Accepts a client connection.
+        :return: client socket and address as returned by the socket.accept method.
+        """
+        sock, address = super(ChatSocket, self).accept()
+        return ChatSocket(_sock=sock), address
 
     def receive(self):
         """
@@ -52,7 +70,7 @@ class ChatSocket(socket.socket):
         """
         size = self._receive_all(MSG_LEN_SIZE)
         if not size:
-            return None
+            return ''
         data = self._receive_all(int(size))
         return data
 
@@ -63,44 +81,66 @@ class ChatSocket(socket.socket):
         :return: received data
         """
         try:
-            data = super(ChatSocket, self).recv(size)
+            data = self.recv(size)
             while len(data) < size:
-                data += super(ChatSocket, self).recv(size - len(data))
+                data += self.recv(size - len(data))
             return data
         except:
             return ''
 
     def receive_obj(self):
-        return pickle.loads(self.receive())
+        """
+        Receives an object from the server.
+        :return: sent object.
+        """
+        try:
+            return pickle.loads(self.receive())
+        except:
+            return ''
+
+    def send_str(self, msg):
+        """
+        Sends a string to the server
+        :param msg: the message object
+        """
+        self.sendall(str(len(msg)).zfill(MSG_LEN_SIZE))
+        self.sendall(msg)
+
+    def send_obj(self, obj):
+        """
+        Sends and object to the server.
+        :param obj: an object.
+        """
+        self.send_str(pickle.dumps(obj))
+
+    def send_msg(self, header, data):
+        """
+        Sends a message to the server.
+        :param header: the message's protocol header.
+        :param data: the message's data.
+        """
+        self.send_obj(messages.Message(header, data))
+
+    def send_regular_msg(self, data):
+        """
+        Sends a regular-type message to the server.
+        :param data: the message's data
+        """
+        self.send_msg(protocols.build_header(protocols.REGULAR), data)
+
+    def _send_chunks(self, chunks, path):
+        for chunk in chunks:
+            self.send_msg(protocols.build_header(protocols.FILE_CHUNK), chunk)
+        self.send_msg(protocols.build_header(protocols.FILE_END, path), '')
 
     def send_file(self, path):
         """
         Sends a file to the server.
         :param path: a path to a file.
         """
-        data_chunks = file_handler.generate_chunks(path, DEF_DATA_CHUNK_SIZE)
-        sender = Thread(target=self._send_chunks, args=[data_chunks, path])
+        path_chunks = file_handler.generate_chunks(path, DEF_DATA_CHUNK_SIZE)
+        sender = Thread(target=self._send_chunks, args=[path_chunks, path])
         sender.start()
-
-    def _send_chunks(self, chunks, path):
-        for chunk in chunks:
-            self.send_str(pickle.dumps(messages.Message(messages.FILE_DATA_CHUNK, chunk)))
-            sleep(0.1)
-        self.send_str(pickle.dumps(messages.Message(messages.FILE_DATA_FIN, path)))
-
-    def send_obj(self, obj):
-        self.send_regular(pickle.dumps(obj))
-
-    def send_regular(self, data):
-        self.send_str(pickle.dumps(messages.Message(messages.REGULAR_MSG, data)))
-
-    def send_str(self, msg):
-        """
-        Sends a pickled message to the server
-        :param msg: the message object
-        """
-        super(ChatSocket, self).sendall(str(len(msg)).zfill(MSG_LEN_SIZE))
-        super(ChatSocket, self).sendall(msg)
 
     def close_sock(self):
         """
@@ -111,3 +151,4 @@ class ChatSocket(socket.socket):
         except:
             pass
         self.close()
+        self.open = False

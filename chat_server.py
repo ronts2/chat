@@ -3,10 +3,9 @@ This module contains the server (main script for the server host)
 The server follows the communication protocol: send size of data - then the data itself
 """
 import select
-import jsonpickle as pickle
 
-from essentials import messages, file_handler, protocols, chatsocket
-from server_utils import commands, serversocket
+from essentials import file_handler, protocols, chatsocket
+from server_utils import commands
 
 MAX_CONNECTIONS = 5
 
@@ -20,12 +19,13 @@ class Server(object):
         """
         The class constructor
         """
-        self.server = serversocket.ServerSocket()
+        self.server = chatsocket.ChatSocket()
         self.users_by_nick = dict()
         self.users_by_client = dict()
         self.downloads = dict()
         self._init_messages()
-        self.protocols = protocols.Protocol()
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, self.broadcast_file,
+                                            self.process_file_chunk, self.save_file)
 
     def _init_messages(self):
         self.connect_message = '{} connected'
@@ -81,11 +81,10 @@ class Server(object):
         :param sock: connection listener
         """
         client, address = sock.accept()
-        client = chatsocket.ChatSocket(_sock=client)
-        user = pickle.loads(client.receive_obj().data)
+        user = client.receive_obj()
         user.client, user.address = client, address[0]
         if user.nickname in self.users_by_nick:
-            client.send_str(self.invalid_nick_message.format(user.nickname))
+            client.send_regular_msg(self.invalid_nick_message.format(user.nickname))
             return
         self.process_new_user(user)
 
@@ -97,7 +96,7 @@ class Server(object):
         self.add_user(user)
         # The host is the owner (Admin) of the server
         if user.address == self.server.server_ip:
-            commands.promote_user(commands.CommandArgs(self, user, ''))
+            commands.promote(commands.CommandArgs(self, user, ''))
         self.broadcast(self.connect_message.format(user.display_name))
 
     def add_user(self, user):
@@ -132,13 +131,13 @@ class Server(object):
             self.disconnect_user(user)
             self.broadcast(self.disconnect_message.format(user.display_name))
 
-    def handle_command(self, user, message):
-        command = commands.Command.parse_msg(message)
+    def handle_command(self, msg, user):
+        command = commands.Command.parse_msg(msg)
         if command:
             if self.check_permission(user, command):
-                command(commands.CommandArgs(self, user, message))
+                command(commands.CommandArgs(self, user, msg))
             else:
-                user.client.send_str(self.no_permission_message)
+                user.client.send_regular_msg(self.no_permission_message)
 
     def check_permission(self, user, command):
         """
@@ -149,6 +148,15 @@ class Server(object):
         """
         return not command.admin_only or user.is_admin
 
+    def handle_regular_msg(self, msg, user):
+        """
+        Handles a regular message.
+        :param msg: the message.
+        :param user: the user who sent the message.
+        """
+        self.broadcast(user.display_name + ': ' + msg.data)
+        self.handle_command(msg.data, user)
+
     def handle_message(self, msg, user):
         """
         Handles the user's message - broadcasts the message and attempts to execute the command
@@ -158,25 +166,28 @@ class Server(object):
         :param user: the user who sent the message
         """
         if user.muted:
-            user.client.send_str(self.muted_message)
-        elif msg.type == messages.REGULAR_MSG:
-            self.broadcast(user.display_name + ': ' + msg.data)
-            self.handle_command(user, msg.data)
+            user.client.send_regular_msg(self.muted_message)
         else:
-            self.handle_protocol(msg, user)
+            self.protocols.initiate_protocol(msg.header, msg=msg, user=user)
 
-    def handle_protocol(self, msg, user):
+    def process_file_chunk(self, user,  msg):
         """
-        Handles protocol messages.
-        :param msg: the user's message
-        :param user: the user who sent the message
+        Adds the file chunk data to the downloaded file data.
+        :param msg: the 'file chunk' message.
+        :param user: the user who sent the file chunk.
         """
-        if msg.type == messages.FILE_DATA_CHUNK:
-            self.downloads[user.nickname].append(msg.data)
-        elif msg.type == messages.FILE_DATA_FIN:
-            file_handler.create_file('dl/' + msg.data, ''.join(self.downloads[user.nickname]))
-            self.downloads[user.nickname] = list()
-            self.broadcast(self.upload_finished_msg.format(msg.data))
+        self.downloads[user.nickname].append(msg.data)
+
+    def save_file(self, name, msg, user):
+        """
+        Saves a downloaded file.
+        :param user: the user who sent the file.
+        :param msg: the 'file finished' message.
+        """
+        file_handler.create_file('dl/' + name, ''.join(self.downloads[user.nickname]))
+        self.downloads[user.nickname] = list()
+        self.broadcast(self.upload_finished_msg.format(name))
+        self.broadcast_file(name)
 
     def change_display_name(self, user, new_nick):
         """
@@ -187,14 +198,25 @@ class Server(object):
         self.users_by_nick[user.nickname].display_name = new_nick
         self.users_by_client[user.client].display_name = new_nick
 
+    def broadcast_file(self, path):
+        """
+        Sends a file to all users.
+        :param path: the file's path.
+        """
+        for client in self.users_by_client:
+            try:
+                client.send_file(path)
+            except:
+                pass
+
     def broadcast(self, content):
         """
         Broadcasts content to everyone
         :param content: the content to send
         """
-        for nick, user in self.users_by_nick.iteritems():
+        for client in self.users_by_client:
             try:
-                user.client.send_str(content)
+                client.send_regular_msg(content)
             except:
                 pass
 
@@ -204,8 +226,7 @@ class Server(object):
         :param user: the user to disconnect
         """
         try:
-            user.client.send_str(self.protocols.build_protocol(flags=[protocols.CONNECTION_FLAG,
-                                                                      protocols.CLOSE_CON]))
+            user.client.send_msg(protocols.build_header(protocols.END_CONNECTION), '')
         except:
             pass
         user.connected = False

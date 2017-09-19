@@ -216,7 +216,7 @@ class GUI(object):
         text = self.input.get('0.0', END).strip()
         # cannot send only white space (pure spaces are the equivalent of an empty message)
         if text != '':
-            self.chat_client.client.send_regular(text)
+            self.chat_client.client.send_regular_msg(text)
         self.input.delete('0.0', END)
         self.update_char_counter()
         return "break"
