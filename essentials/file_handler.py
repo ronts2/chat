@@ -28,8 +28,8 @@ def create_file(path, data):
     :param path: the file path.
     :param data: the file's data
     """
-    if not os.path.exists(path):
-        with open(path, 'w+') as file:
-            pass
+    dir_path = os.path.dirname(path)
+    if not os.path.exists(dir_path):
+        os.mkdir(dir_path)
     with open(path, 'wb') as file:
         file.write(data)
