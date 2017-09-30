@@ -5,7 +5,7 @@ import re
 import time
 from threading import Thread
 
-from client_utils import gui, user
+from client_utils import gui
 from essentials import file_handler, protocols, chatsocket
 
 CLIENT_THREAD_TIMEOUT = 3
@@ -35,7 +35,7 @@ class ChatClient(object):
         self.gui = gui.GUI(self)
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file,
                                             self.download_file, self.create_file, self.request_file)
-        self.downloads = list()
+        self.downloads = dict()
 
     def exit(self):
         self.client.send_regular_msg(QUIT_MSG)
@@ -55,13 +55,19 @@ class ChatClient(object):
         self.client.send_msg(protocols.build_header(protocols.REQUEST_FILE, name), '')
 
     def send_file(self, path, **kwargs):
-        self.client.send_file(path)
+        try:
+            self.client.send_file(path)
+        except:
+            self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
 
-    def download_file(self,  msg):
+    def download_file(self, user, msg):
+        exists = self.downloads.get(user)
+        if not exists:
+            self.downloads[user] = list()
         if msg.data:
-            self.downloads.append(msg.data)
+            self.downloads[user].append(msg.data)
         else:
-            self.downloads = list()
+            del self.downloads[user]
 
     def create_file(self, name, **kwargs):
         file_handler.create_file('client_dl/' + name, ''.join(self.downloads))
@@ -90,7 +96,7 @@ class ChatClient(object):
             self.gui.display_connection_status(False)
             quit()
         self.gui.display_connection_status(True)
-        self.client.send_obj(user.User(nickname))
+        self.client.send_str(nickname)
         self.receive_messages()
         if self.gui.running:
             self.gui.display_connection_status(False)

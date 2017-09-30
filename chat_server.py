@@ -5,7 +5,7 @@ The server follows the communication protocol: send size of data - then the data
 import select
 
 from essentials import file_handler, protocols, chatsocket
-from server_utils import commands
+from server_utils import commands, user
 
 MAX_CONNECTIONS = 5
 
@@ -24,7 +24,7 @@ class Server(object):
         self.users_by_client = dict()
         self.downloads = dict()
         self._init_messages()
-        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, self.broadcast_file,
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, None, self.file_not_found,
                                             self.process_file_chunk, self.save_file)
 
     def _init_messages(self):
@@ -43,9 +43,10 @@ class Server(object):
         self.promote_message = 'You are now an admin.'
         self.demote_message = 'You are now a regular.'
         self.user_not_found = 'User {} not found.'
-        self.upload_start_msg = '{} is being uploaded.'
+        self.upload_start_msg = 'Attempting to upload file: {}'
         self.already_uploading_msg = 'You can only upload one file at a time.'
         self.upload_finished_msg = '{} has finished uploading!'
+        self.file_not_found_msg = 'file: {} was not found.'
 
     # Server utilities
     def start_server(self):
@@ -81,12 +82,11 @@ class Server(object):
         :param sock: connection listener
         """
         client, address = sock.accept()
-        user = client.receive_obj()
-        user.client, user.address = client, address[0]
-        if user.nickname in self.users_by_nick:
-            client.send_regular_msg(self.invalid_nick_message.format(user.nickname))
+        nick = client.receive()
+        if nick in self.users_by_nick:
+            client.send_regular_msg(self.invalid_nick_message.format(nick))
             return
-        self.process_new_user(user)
+        self.process_new_user(user.User(nick, client, address[0]))
 
     def process_new_user(self, user):
         """
@@ -170,24 +170,34 @@ class Server(object):
         else:
             self.protocols.initiate_protocol(msg.header, msg=msg, user=user)
 
+    def file_not_found(self, name, user, msg):
+        """
+        Handles a file not found message.
+        :param name: the file's name
+        :param user: the user who who sent the message.
+        :param msg: the 'file not found' message.
+        """
+        self.broadcast(self.file_not_found_msg.format(name))
+
     def process_file_chunk(self, user,  msg):
         """
         Adds the file chunk data to the downloaded file data.
-        :param msg: the 'file chunk' message.
         :param user: the user who sent the file chunk.
+        :param msg: the 'file chunk' message.
         """
         self.downloads[user.nickname].append(msg.data)
 
-    def save_file(self, name, msg, user):
+    def save_file(self, name, user, msg):
         """
         Saves a downloaded file.
+        :param name: the file's name.
         :param user: the user who sent the file.
         :param msg: the 'file finished' message.
         """
         file_handler.create_file('dl/' + name, ''.join(self.downloads[user.nickname]))
         self.downloads[user.nickname] = list()
         self.broadcast(self.upload_finished_msg.format(name))
-        self.broadcast_file(name)
+        self.broadcast_file(name, user.nickname)
 
     def change_display_name(self, user, new_nick):
         """
@@ -198,14 +208,15 @@ class Server(object):
         self.users_by_nick[user.nickname].display_name = new_nick
         self.users_by_client[user.client].display_name = new_nick
 
-    def broadcast_file(self, path):
+    def broadcast_file(self, path, name):
         """
         Sends a file to all users.
         :param path: the file's path.
+        :param name: the name of the user who uploaded the file.
         """
         for client in self.users_by_client:
             try:
-                client.send_file(path)
+                client.send_file(path, name)
             except:
                 pass
 

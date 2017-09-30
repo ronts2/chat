@@ -1,6 +1,15 @@
 import os
 
 
+def get_name_from_path(path):
+    """
+    Extracts the file's name from a path.
+    :param path: path to a file.
+    :return: the file's name.
+    """
+    return os.path.basename(path)
+
+
 def load_file(path):
     """
     Loads a file.

@@ -7,6 +7,7 @@ REGULAR = 'reg'
 END_CONNECTION = 'end_con'
 
 REQUEST_FILE = 'req_file'
+FILE_NOT_FOUND = 'file_not_found'
 FILE_CHUNK = 'file_chunk'
 FILE_END = 'file_end'
 
@@ -26,10 +27,10 @@ def build_header(protocol, resource=None):
 
 class Protocol(object):
     """This class is used to allow client-server communication behind the scenes."""
-    def __init__(self, regular, end_connection, request_file, file_chunk, file_end, file_dl=None):
+    def __init__(self, regular, end_connection, request_file, file_not_found, file_chunk, file_end, file_dl=None):
         """The class constructor."""
         self.protocols = {REGULAR: regular, END_CONNECTION: end_connection, REQUEST_FILE: request_file,
-                          FILE_CHUNK: file_chunk, FILE_END: file_end, FILE_DL: file_dl}
+                          FILE_NOT_FOUND: file_not_found, FILE_CHUNK: file_chunk, FILE_END: file_end, FILE_DL: file_dl}
 
     def check_protocol(self, text):
         """Checks whether a string is a protocol message.

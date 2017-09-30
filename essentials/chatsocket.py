@@ -100,7 +100,7 @@ class ChatSocket(socket.socket):
 
     def send_str(self, msg):
         """
-        Sends a string to the server
+        Sends a string
         :param msg: the message object
         """
         self.sendall(str(len(msg)).zfill(MSG_LEN_SIZE))
@@ -108,14 +108,14 @@ class ChatSocket(socket.socket):
 
     def send_obj(self, obj):
         """
-        Sends and object to the server.
+        Sends and object.
         :param obj: an object.
         """
         self.send_str(pickle.dumps(obj))
 
     def send_msg(self, header, data):
         """
-        Sends a message to the server.
+        Sends a message.
         :param header: the message's protocol header.
         :param data: the message's data.
         """
@@ -123,28 +123,37 @@ class ChatSocket(socket.socket):
 
     def send_regular_msg(self, data):
         """
-        Sends a regular-type message to the server.
+        Sends a regular-type message.
         :param data: the message's data
         """
         self.send_msg(protocols.build_header(protocols.REGULAR), data)
 
-    def _send_chunks(self, chunks, path):
+    def _send_chunks(self, chunks, path, name):
+        """
+        Sends chunks of a file.
+        :param chunks: a collection of a file's data in chunks.
+        :param path: the file's path.
+        :param name: the sender's name.
+        """
         for chunk in chunks:
-            self.send_msg(protocols.build_header(protocols.FILE_CHUNK), chunk)
+            self.send_msg(protocols.build_header(protocols.FILE_CHUNK, name), chunk)
         self.send_msg(protocols.build_header(protocols.FILE_END, path), '')
 
-    def send_file(self, path):
+    def send_file(self, path, name=None):
         """
-        Sends a file to the server.
+        Sends a file.
         :param path: a path to a file.
+        :param name: the name of the sender.
+        Name is necessary for instances where the receiver has no indication of the sender's identity.
         """
-        path_chunks = file_handler.generate_chunks(path, DEF_DATA_CHUNK_SIZE)
-        sender = Thread(target=self._send_chunks, args=[path_chunks, path])
+        file_chunks = file_handler.generate_chunks(path, DEF_DATA_CHUNK_SIZE)
+        path = file_handler.get_name_from_path(path)
+        sender = Thread(target=self._send_chunks, args=[file_chunks, path, name or ''])
         sender.start()
 
     def close_sock(self):
         """
-        Closes the socket
+        Closes the socket.
         """
         try:
             self.shutdown(socket.SHUT_RDWR)  # Stop receiving/sending
