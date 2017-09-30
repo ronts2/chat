@@ -55,10 +55,10 @@ class ChatClient(object):
         self.client.send_msg(protocols.build_header(protocols.REQUEST_FILE, name), '')
 
     def send_file(self, path, **kwargs):
-        try:
-            self.client.send_file(path)
-        except:
+        if not file_handler.path_exists(path):
             self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
+        else:
+            self.client.send_file(path)
 
     def download_file(self, user, msg):
         exists = self.downloads.get(user)
