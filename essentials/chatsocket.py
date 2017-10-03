@@ -20,6 +20,9 @@ DEF_DATA_CHUNK_SIZE = 1048576
 DEF_LISTEN = 1
 
 
+CHUNK_SEND_WAIT = 0.1
+
+
 class ChatSocket(socket.socket):
     """
     The chat socket follows the communication protocol: send size of data - then the data itself
@@ -135,12 +138,9 @@ class ChatSocket(socket.socket):
         :param chunks: a collection of a file's data in chunks.
         :param path: the file's path.
         """
-        chunk_num = 0
         for chunk in chunks:
-            chunk_num += 1
             self.send_msg(protocols.build_header(protocols.FILE_CHUNK, path), chunk)
-            sleep(0.1)
-        print 'chunks: ', str(chunk_num)
+            sleep(CHUNK_SEND_WAIT)
         self.send_msg(protocols.build_header(protocols.FILE_END, path), '')
 
     def send_file(self, path):
