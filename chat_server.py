@@ -7,6 +7,7 @@ import select
 from essentials import file_handler, protocols, chatsocket
 from server_utils import commands, user
 
+DL_DIR = 'dl'
 MAX_CONNECTIONS = 5
 
 
@@ -24,8 +25,8 @@ class Server(object):
         self.users_by_client = dict()
         self.downloads = dict()
         self._init_messages()
-        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, None, self.file_not_found,
-                                            self.process_file_chunk, self.save_file)
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, self.send_file,
+                                            self.file_not_found, self.process_file_chunk, self.file_end)
 
     def _init_messages(self):
         self.connect_message = '{} connected'
@@ -170,6 +171,15 @@ class Server(object):
         else:
             self.protocols.initiate_protocol(msg.header, msg=msg, user=user)
 
+    def send_file(self, name, user, msg):
+        """
+        Handles a file request.
+        :param name: the file's name
+        :param user: the user who who requested the file.
+        :param msg: the request message.
+        """
+        user.client.send_file(name)
+
     def file_not_found(self, name, user, msg):
         """
         Handles a file not found message.
@@ -179,25 +189,24 @@ class Server(object):
         """
         self.broadcast(self.file_not_found_msg.format(name))
 
-    def process_file_chunk(self, user,  msg):
+    def process_file_chunk(self, name, user, msg):
         """
         Adds the file chunk data to the downloaded file data.
+        :param name: the file's name.
         :param user: the user who sent the file chunk.
-        :param msg: the 'file chunk' message.
+        :param msg: the message.
         """
-        self.downloads[user.nickname].append(msg.data)
+        file_handler.create_file(file_handler.get_location(DL_DIR, name), msg.data)
 
-    def save_file(self, name, user, msg):
+    def file_end(self, name, user, msg):
         """
-        Saves a downloaded file.
+        Handles a file-end protocol.
         :param name: the file's name.
         :param user: the user who sent the file.
-        :param msg: the 'file finished' message.
+        :param msg: the 'file end' message.
         """
-        file_handler.create_file('dl/' + name, ''.join(self.downloads[user.nickname]))
-        self.downloads[user.nickname] = list()
         self.broadcast(self.upload_finished_msg.format(name))
-        self.broadcast_file(name, user.nickname)
+        self.broadcast_file(name)
 
     def change_display_name(self, user, new_nick):
         """
@@ -208,15 +217,14 @@ class Server(object):
         self.users_by_nick[user.nickname].display_name = new_nick
         self.users_by_client[user.client].display_name = new_nick
 
-    def broadcast_file(self, path, name):
+    def broadcast_file(self, path):
         """
         Sends a file to all users.
         :param path: the file's path.
-        :param name: the name of the user who uploaded the file.
         """
         for client in self.users_by_client:
             try:
-                client.send_file(path, name)
+                client.send_msg(protocols.build_header(protocols.FILE_DL, path), '')
             except:
                 pass
 

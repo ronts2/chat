@@ -45,9 +45,12 @@ class Protocol(object):
         :param header: the received message's header.
         :param kwargs: additional arguments to pass.
         """
-        protocol, data = header.split(':')
+        components = header.split(':')
+        protocol, data = components[0], filter(None, components[1:])
         func = self.protocols[protocol]
+        if not func:
+            print protocol
         if not data:
             func(**kwargs)
         else:
-            func(data, **kwargs)
+            func(*data, **kwargs)

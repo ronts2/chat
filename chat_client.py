@@ -12,6 +12,7 @@ CLIENT_THREAD_TIMEOUT = 3
 GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
 QUIT_MSG = '?quit'
+DL_DIR = 'client_dl'
 
 
 def get_nick():
@@ -33,8 +34,8 @@ class ChatClient(object):
         """
         self.client = chatsocket.ChatSocket()
         self.gui = gui.GUI(self)
-        self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file,
-                                            self.download_file, self.create_file, self.request_file)
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file, None,
+                                            self.process_file_chunk, self.process_file_chunk, self.request_file)
         self.downloads = dict()
 
     def exit(self):
@@ -55,22 +56,23 @@ class ChatClient(object):
         self.client.send_msg(protocols.build_header(protocols.REQUEST_FILE, name), '')
 
     def send_file(self, path, **kwargs):
-        if not file_handler.path_exists(path):
+        """
+        Handles file requests.
+        :param path: the requested file's path.
+        """
+        if not file_handler.PATH_EXISTS(path):
             self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
         else:
             self.client.send_file(path)
 
-    def download_file(self, user, msg):
-        exists = self.downloads.get(user)
-        if not exists:
-            self.downloads[user] = list()
+    def process_file_chunk(self, name, msg):
+        """
+        Processes a file chunk.
+        :param name: the file's name.
+        :param msg: the message.
+        """
         if msg.data:
-            self.downloads[user].append(msg.data)
-        else:
-            del self.downloads[user]
-
-    def create_file(self, name, **kwargs):
-        file_handler.create_file('client_dl/' + name, ''.join(self.downloads))
+            file_handler.create_file(file_handler.get_location(DL_DIR, name), msg.data)
 
     def handle_regular_msg(self, msg):
         """

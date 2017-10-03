@@ -1,22 +1,17 @@
 import os
 
 
-def path_exists(path):
-    """
-    Checks whether the path exists.
-    :param path: the path.
-    :return: True if path exists, otherwise False.
-    """
-    return os.path.exists(path)
+PATH_EXISTS = os.path.exists
+GET_FILE_NAME = os.path.basename
 
 
-def get_name_from_path(path):
+def get_location(*args):
     """
-    Extracts the file's name from a path.
-    :param path: path to a file.
-    :return: the file's name.
+    Generates the absolute path for a directory.
+    :param args: directory components.
+    :return: absolute path string.
     """
-    return os.path.basename(path)
+    return os.path.abspath(os.path.join(*args))
 
 
 def generate_chunks(path, size):
@@ -40,7 +35,7 @@ def create_file(path, data):
     :param data: the file's data
     """
     dir_path = os.path.dirname(path)
-    if not path_exists(dir_path):
+    if not PATH_EXISTS(dir_path):
         os.mkdir(dir_path)
-    with open(path, 'wb') as file:
+    with open(path, 'ab') as file:
         file.write(data)

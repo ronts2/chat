@@ -5,17 +5,18 @@ The ChatClient follows the communication protocol: send size of data - then the 
 import socket
 import jsonpickle as pickle
 from threading import Thread
+from time import sleep
 
 import file_handler
 import messages
 import protocols
 
-MSG_LEN_SIZE = 6  # The size of the length of a message
+MSG_LEN_SIZE = 10  # The size of the length of a message
 # the default server ip address - the current computer
 DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
 # the default server port - the host's choice
 DEF_SERVER_PORT = 9900
-DEF_DATA_CHUNK_SIZE = 4096
+DEF_DATA_CHUNK_SIZE = 1048576
 DEF_LISTEN = 1
 
 
@@ -128,27 +129,29 @@ class ChatSocket(socket.socket):
         """
         self.send_msg(protocols.build_header(protocols.REGULAR), data)
 
-    def _send_chunks(self, chunks, path, name):
+    def _send_chunks(self, chunks, path):
         """
         Sends chunks of a file.
         :param chunks: a collection of a file's data in chunks.
         :param path: the file's path.
-        :param name: the sender's name.
         """
+        chunk_num = 0
         for chunk in chunks:
-            self.send_msg(protocols.build_header(protocols.FILE_CHUNK, name), chunk)
+            chunk_num += 1
+            self.send_msg(protocols.build_header(protocols.FILE_CHUNK, path), chunk)
+            sleep(0.1)
+        print 'chunks: ', str(chunk_num)
         self.send_msg(protocols.build_header(protocols.FILE_END, path), '')
 
-    def send_file(self, path, name=None):
+    def send_file(self, path):
         """
         Sends a file.
-        :param path: a path to a file.
-        :param name: the name of the sender.
+        :param path: a path of a file.
         Name is necessary for instances where the receiver has no indication of the sender's identity.
         """
         file_chunks = file_handler.generate_chunks(path, DEF_DATA_CHUNK_SIZE)
-        path = file_handler.get_name_from_path(path)
-        sender = Thread(target=self._send_chunks, args=[file_chunks, path, name or ''])
+        path = file_handler.GET_FILE_NAME(path)
+        sender = Thread(target=self._send_chunks, args=[file_chunks, path])
         sender.start()
 
     def close_sock(self):
