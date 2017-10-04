@@ -47,6 +47,7 @@ class Server(object):
         self.upload_start_msg = 'Attempting to upload file: {}'
         self.already_uploading_msg = 'You can only upload one file at a time.'
         self.upload_finished_msg = '{} has finished uploading!'
+        self.file_send_started = 'Attempting to send you: {}'
         self.file_not_found_msg = 'file: {} was not found.'
 
     # Server utilities
@@ -178,6 +179,7 @@ class Server(object):
         :param user: the user who who requested the file.
         :param msg: the request message.
         """
+        user.client.send_regular_msg(self.file_send_started.format(name))
         user.client.send_file(name)
 
     def file_not_found(self, name, user, msg):
@@ -206,7 +208,7 @@ class Server(object):
         :param msg: the 'file end' message.
         """
         self.broadcast(self.upload_finished_msg.format(name))
-        self.broadcast_file(name)
+        user.uploading = False
 
     def change_display_name(self, user, new_nick):
         """

@@ -17,7 +17,7 @@ DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
 # the default server port - the host's choice
 DEF_SERVER_PORT = 9900
 DEF_DATA_CHUNK_SIZE = 1048576
-DEF_LISTEN = 1
+DEF_LISTEN = 5
 
 
 CHUNK_SEND_WAIT = 0.1

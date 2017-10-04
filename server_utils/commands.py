@@ -94,13 +94,10 @@ class CommandArgs(object):
         :return: User object if the user was found, otherwise sends the server's
         user-not-found message to the sender of the message
         """
-        target = self.server.users_by_nick.get(name)
-        if not target:
-            self.user.client.send_regular_msg(self.server.user_not_found.format(name))
-        return target
+        return self.server.users_by_nick.get(name) or name
 
     @property
-    def target(self):
+    def target_user(self):
         """
         Gets the User object of the user who were targeted in the command
         :return: User object of the sender of the message if the command is not targeted,
@@ -150,8 +147,8 @@ def whisper(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     content = ' '.join(args_obj.args[2:])
@@ -165,8 +162,8 @@ def kick(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     target.client.send_regular_msg(server.kick_message_whisper)
@@ -181,8 +178,8 @@ def mute(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     target.muted = True
@@ -196,8 +193,8 @@ def unmute(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.muted:
@@ -212,8 +209,8 @@ def promote(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if not target.is_admin:
@@ -229,8 +226,8 @@ def demote(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    target = args_obj.target
-    if not target:
+    target = args_obj.target_user
+    if isinstance(target, (str, unicode)):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.is_admin:
@@ -246,8 +243,9 @@ def send_file(args_obj):
     """
     server = args_obj.server
     user = args_obj.user
-    if server.downloads[user.nickname]:
+    if user.uploading:
         user.client.send_regular_msg(server.already_uploading_msg)
+    user.uploading = True
     name = args_obj.args[1]
     request = protocols.build_header(protocols.REQUEST_FILE, name)
     user.client.send_msg(request, '')

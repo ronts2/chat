@@ -13,6 +13,7 @@ GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
 QUIT_MSG = '?quit'
 DL_DIR = 'client_dl'
+FILE_FIN_MSG = 'file: {} has finished downloading.'
 
 
 def get_nick():
@@ -20,7 +21,7 @@ def get_nick():
         nick = raw_input('Enter nickname: ')
         if NICKNAME_REG.match(nick):
             return nick
-        print "Invalid nickname! Nickname must not start with '@' and have no white space."
+        print "Invalid nickname! Nickname may only contain letters and numbers."
 
 
 class ChatClient(object):
@@ -33,9 +34,8 @@ class ChatClient(object):
         The class constructor
         """
         self.client = chatsocket.ChatSocket()
-        self.gui = gui.GUI(self)
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file, None,
-                                            self.process_file_chunk, self.process_file_chunk, self.request_file)
+                                            self.process_file_chunk, self.file_end, self.request_file)
         self.downloads = dict()
 
     def exit(self):
@@ -74,6 +74,14 @@ class ChatClient(object):
         if msg.data:
             file_handler.create_file(file_handler.get_location(DL_DIR, name), msg.data)
 
+    def file_end(self, name, msg):
+        """
+        Notify the user that a download has finished.
+        :param name: the file's name.
+        :param msg: the message.
+        """
+        self.gui.display_message(FILE_FIN_MSG.format(name))
+
     def handle_regular_msg(self, msg):
         """
         Handles regular-type messages.
@@ -109,6 +117,7 @@ class ChatClient(object):
         Starts the gui, displays the connection status and receives message from the server
         """
         nickname = get_nick()
+        self.gui = gui.GUI(self)
         client_thread = Thread(target=self.initiate_conversation, args=[nickname])
         client_thread.start()
         self.gui.start_gui('Chat - ' + nickname)

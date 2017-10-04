@@ -23,3 +23,4 @@ class User(object):
         self.is_admin = False
         self.muted = False
         self.connected = False
+        self.uploading = False
