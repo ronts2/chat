@@ -1,5 +1,5 @@
 """
-This module contains the chat client (main script for users)
+This module contains the chat client (main script for users).
 """
 import re
 import time
@@ -14,6 +14,7 @@ NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
 QUIT_MSG = '?quit'
 DL_DIR = 'client_dl'
 FILE_FIN_MSG = 'file: {} has finished downloading.'
+FILE_UP_START = 'Uploading file. please wait.'
 
 
 def get_nick():
@@ -26,17 +27,16 @@ def get_nick():
 
 class ChatClient(object):
     """
-    This class is the main chatsocket script
-    It is used to run the application (with a GUI)
+    This class is the main chatsocket script.
+    It is used to run the application (with a GUI).
     """
     def __init__(self):
         """
-        The class constructor
+        The class constructor.
         """
         self.client = chatsocket.ChatSocket()
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file, None,
-                                            self.process_file_chunk, self.file_end, self.request_file)
-        self.downloads = dict()
+                                            None, None, None, None)
 
     def exit(self):
         self.client.send_regular_msg(QUIT_MSG)
@@ -63,6 +63,7 @@ class ChatClient(object):
         if not file_handler.PATH_EXISTS(path):
             self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
         else:
+            self.gui.display_message(FILE_UP_START)
             self.client.send_file(path)
 
     def process_file_chunk(self, name, msg):
@@ -72,15 +73,7 @@ class ChatClient(object):
         :param msg: the message.
         """
         if msg.data:
-            file_handler.create_file(file_handler.get_location(DL_DIR, name), msg.data)
-
-    def file_end(self, name, msg):
-        """
-        Notify the user that a download has finished.
-        :param name: the file's name.
-        :param msg: the message.
-        """
-        self.gui.display_message(FILE_FIN_MSG.format(name))
+            file_handler.create_file(file_handler.get_location(DL_DIR, name))
 
     def handle_regular_msg(self, msg):
         """

@@ -1,6 +1,6 @@
 """
-This module contains the server (main script for the server host)
-The server follows the communication protocol: send size of data - then the data itself
+This module contains the server (main script for the server host).
+The server follows the communication protocol: send size of data - then the data itself.
 """
 import select
 
@@ -13,20 +13,21 @@ MAX_CONNECTIONS = 5
 
 class Server(object):
     """
-    This class is a chat server
-    It is used to set up the server
+    This class is a chat server.
+    It is used to set up the server.
     """
     def __init__(self):
         """
-        The class constructor
+        The class constructor.
         """
         self.server = chatsocket.ChatSocket()
         self.users_by_nick = dict()
         self.users_by_client = dict()
-        self.downloads = dict()
+        self.open_files = dict()
         self._init_messages()
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, self.send_file,
-                                            self.file_not_found, self.process_file_chunk, self.file_end)
+                                            self.file_not_found, self.file_start, self.process_file_chunk,
+                                            self.file_end, None)
 
     def _init_messages(self):
         self.connect_message = '{} connected'
@@ -53,8 +54,8 @@ class Server(object):
     # Server utilities
     def start_server(self):
         """
-        Starts the server -> polls the network for incoming connections/messages
-        Proceeds to process them
+        Starts the server -> polls the network for incoming connections/messages.
+        Proceeds to process them.
         """
         print 'IP:', self.server.server_ip, 'Port:', self.server.port
         self.server.initialize_server_socket()
@@ -68,8 +69,8 @@ class Server(object):
 
     def handle_inputs(self, readable):
         """
-        Processes the incoming inputs
-        :param readable: list of inputs
+        Processes the incoming inputs.
+        :param readable: list of inputs.
         """
         for sock in readable:
             if sock is self.server:
@@ -80,20 +81,22 @@ class Server(object):
 
     def accept_new_user(self, sock):
         """
-        Accepts the chatsocket socket connection and creates a User object
-        :param sock: connection listener
+        Accepts the chatsocket socket connection and creates a User object.
+        :param sock: connection listener.
         """
         client, address = sock.accept()
         nick = client.receive()
         if nick in self.users_by_nick:
             client.send_regular_msg(self.invalid_nick_message.format(nick))
+            client.send_close_msg()
+            client.close()
             return
         self.process_new_user(user.User(nick, client, address[0]))
 
     def process_new_user(self, user):
         """
-        Finalizes the connecting process
-        :param user: a User object
+        Finalizes the connecting process.
+        :param user: a User object.
         """
         self.add_user(user)
         # The host is the owner (Admin) of the server
@@ -103,28 +106,28 @@ class Server(object):
 
     def add_user(self, user):
         """
-        Updates user dictionaries to accommodate the new user
-        :param user: a USer object
+        Updates user dictionaries to accommodate the new user.
+        :param user: a USer object.
         """
         user.connected = True
         self.users_by_nick[user.nickname] = user
         self.users_by_client[user.client] = user
-        self.downloads[user.nickname] = list()
+        self.open_files[user.nickname] = None
 
     def remove_user(self, user):
         """
-        Updates user dictionaries to accommodate the new user
-        :param user: a USer object
+        Updates user dictionaries to accommodate the new user.
+        :param user: a USer object.
         """
         del self.users_by_nick[user.nickname]
         del self.users_by_client[user.client]
-        del self.downloads[user.nickname]
+        del self.open_files[user.nickname]
 
     # Server logic
     def handle_client(self, user):
         """
-        Handles the chatsocket's needs
-        :param user: the user to handle
+        Handles the chatsocket's needs.
+        :param user: the user to handle.
         """
         msg = user.client.receive_obj()
         if msg:
@@ -143,10 +146,10 @@ class Server(object):
 
     def check_permission(self, user, command):
         """
-        Checks if the user is allowed to execute the command
-        :param user: the user who wishes to execute the command
-        :param command: the command which is wished to be executed
-        :return: True if user is allowed to execute said command, False otherwise
+        Checks if the user is allowed to execute the command.
+        :param user: the user who wishes to execute the command.
+        :param command: the command which is wished to be executed.
+        :return: True if user is allowed to execute said command, False otherwise.
         """
         return not command.admin_only or user.is_admin
 
@@ -161,11 +164,11 @@ class Server(object):
 
     def handle_message(self, msg, user):
         """
-        Handles the user's message - broadcasts the message and attempts to execute the command
-        unless the user's muted, in which case it will do nothing but send the user
-        a reminder that he is muted
-        :param msg: the user's message
-        :param user: the user who sent the message
+        Handles the user's message - broadcasts the message and attempts to execute the command.
+        unless the user's muted, in which case it will do nothing but send the user.
+        a reminder that he is muted.
+        :param msg: the user's message.
+        :param user: the user who sent the message.
         """
         if user.muted:
             user.client.send_regular_msg(self.muted_message)
@@ -175,7 +178,7 @@ class Server(object):
     def send_file(self, name, user, msg):
         """
         Handles a file request.
-        :param name: the file's name
+        :param name: the file's name.
         :param user: the user who who requested the file.
         :param msg: the request message.
         """
@@ -185,11 +188,16 @@ class Server(object):
     def file_not_found(self, name, user, msg):
         """
         Handles a file not found message.
-        :param name: the file's name
+        :param name: the file's name.
         :param user: the user who who sent the message.
         :param msg: the 'file not found' message.
         """
         self.broadcast(self.file_not_found_msg.format(name))
+
+    def file_start(self, name, user, msg):
+        name = file_handler.get_location(DL_DIR, name)
+        file_handler.create_file(name)
+        self.open_files[user] = file_handler.open_file(name)
 
     def process_file_chunk(self, name, user, msg):
         """
@@ -198,7 +206,7 @@ class Server(object):
         :param user: the user who sent the file chunk.
         :param msg: the message.
         """
-        file_handler.create_file(file_handler.get_location(DL_DIR, name), msg.data)
+        self.open_files[user].write(msg.data)
 
     def file_end(self, name, user, msg):
         """
@@ -207,14 +215,17 @@ class Server(object):
         :param user: the user who sent the file.
         :param msg: the 'file end' message.
         """
+        self.open_files[user].close()
+        self.open_files[user] = None
+        user.client.send_msg(protocols.build_header(protocols.FILE_END, name), '')
         self.broadcast(self.upload_finished_msg.format(name))
         user.uploading = False
 
     def change_display_name(self, user, new_nick):
         """
-        changes the nickname of a user
-        :param user: the user whose nickname will change
-        :param new_nick: The new nickname
+        changes the nickname of a user.
+        :param user: the user whose nickname will change.
+        :param new_nick: The new nickname.
         """
         self.users_by_nick[user.nickname].display_name = new_nick
         self.users_by_client[user.client].display_name = new_nick
@@ -247,7 +258,7 @@ class Server(object):
         :param user: the user to disconnect
         """
         try:
-            user.client.send_msg(protocols.build_header(protocols.END_CONNECTION), '')
+            user.client.send_close_msg()
         except:
             pass
         user.connected = False

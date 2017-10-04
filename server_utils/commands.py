@@ -245,6 +245,7 @@ def send_file(args_obj):
     user = args_obj.user
     if user.uploading:
         user.client.send_regular_msg(server.already_uploading_msg)
+        return
     user.uploading = True
     name = args_obj.args[1]
     request = protocols.build_header(protocols.REQUEST_FILE, name)

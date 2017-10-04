@@ -132,12 +132,19 @@ class ChatSocket(socket.socket):
         """
         self.send_msg(protocols.build_header(protocols.REGULAR), data)
 
+    def send_close_msg(self):
+        """
+        Sends a connection-close messag.
+        """
+        self.send_msg(protocols.build_header(protocols.END_CONNECTION), '')
+
     def _send_chunks(self, chunks, path):
         """
         Sends chunks of a file.
         :param chunks: a collection of a file's data in chunks.
         :param path: the file's path.
         """
+        self.send_msg(protocols.build_header(protocols.FILE_START, path), '')
         for chunk in chunks:
             self.send_msg(protocols.build_header(protocols.FILE_CHUNK, path), chunk)
             sleep(CHUNK_SEND_WAIT)

@@ -28,14 +28,17 @@ def generate_chunks(path, size):
             data = file.read(size)
 
 
-def create_file(path, data):
+def open_file(path):
+    return open(path, 'wb')
+
+
+def create_file(path):
     """
-    Creates a file in the given path with the given data.
+    Creates a file in the given path.
     :param path: the file path.
-    :param data: the file's data
     """
     dir_path = os.path.dirname(path)
     if not PATH_EXISTS(dir_path):
         os.mkdir(dir_path)
-    with open(path, 'ab') as file:
-        file.write(data)
+    with open(path, 'wb') as file:
+        pass
