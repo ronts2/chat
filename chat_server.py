@@ -25,7 +25,7 @@ class Server(object):
         self.users_by_client = dict()
         self.open_files = dict()
         self._init_messages()
-        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, self.send_file,
+        self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, None,
                                             self.file_not_found, self.file_start, self.process_file_chunk,
                                             self.file_end, None)
 
@@ -48,7 +48,6 @@ class Server(object):
         self.upload_start_msg = 'Attempting to upload file: {}'
         self.already_uploading_msg = 'You can only upload one file at a time.'
         self.upload_finished_msg = '{} has finished uploading!'
-        self.file_send_started = 'Attempting to send you: {}'
         self.file_not_found_msg = 'file: {} was not found.'
 
     # Server utilities
@@ -175,16 +174,6 @@ class Server(object):
         else:
             self.protocols.initiate_protocol(msg.header, msg=msg, user=user)
 
-    def send_file(self, name, user, msg):
-        """
-        Handles a file request.
-        :param name: the file's name.
-        :param user: the user who who requested the file.
-        :param msg: the request message.
-        """
-        user.client.send_regular_msg(self.file_send_started.format(name))
-        user.client.send_file(name)
-
     def file_not_found(self, name, user, msg):
         """
         Handles a file not found message.
@@ -217,8 +206,8 @@ class Server(object):
         """
         self.open_files[user].close()
         self.open_files[user] = None
-        user.client.send_msg(protocols.build_header(protocols.FILE_END, name), '')
         self.broadcast(self.upload_finished_msg.format(name))
+        user.client.send_msg(protocols.build_header(protocols.FILE_END, name), '')
         user.uploading = False
 
     def change_display_name(self, user, new_nick):
@@ -229,17 +218,6 @@ class Server(object):
         """
         self.users_by_nick[user.nickname].display_name = new_nick
         self.users_by_client[user.client].display_name = new_nick
-
-    def broadcast_file(self, path):
-        """
-        Sends a file to all users.
-        :param path: the file's path.
-        """
-        for client in self.users_by_client:
-            try:
-                client.send_msg(protocols.build_header(protocols.FILE_DL, path), '')
-            except:
-                pass
 
     def broadcast(self, content):
         """
