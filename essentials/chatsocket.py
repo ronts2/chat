@@ -13,7 +13,7 @@ import protocols
 
 MSG_LEN_SIZE = 10  # The size of the length of a message
 # the default server ip address - the current computer
-DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
+DEF_SERVER_IP = '0.0.0.0'
 # the default server port - the host's choice
 DEF_SERVER_PORT = 9900
 DEF_DATA_CHUNK_SIZE = 1048576

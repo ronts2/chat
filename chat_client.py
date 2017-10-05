@@ -8,6 +8,7 @@ from threading import Thread
 from client_utils import gui
 from essentials import file_handler, protocols, chatsocket
 
+SERVER_ADDRESS = 'ronsite.ddns.net'
 CLIENT_THREAD_TIMEOUT = 3
 GUI_WAIT_TIME = 0.2  # seconds to wait while the gui is initializing
 NICKNAME_REG = re.compile('^[a-zA-Z]([a-zA-Z0-9])*$')
@@ -34,7 +35,7 @@ class ChatClient(object):
         """
         The class constructor.
         """
-        self.client = chatsocket.ChatSocket(server_ip='109.66.138.185')
+        self.client = chatsocket.ChatSocket(server_ip=SERVER_ADDRESS)
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file, None, None, None,
                                             self.file_end, None)
 
