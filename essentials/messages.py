@@ -2,6 +2,9 @@
 
 
 class Message(object):
+    """
+    This class is used to Encapsulate sent strings.
+    """
     def __init__(self, header, data):
         """
         The class constructor.

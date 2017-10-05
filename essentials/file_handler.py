@@ -1,3 +1,6 @@
+"""
+This module
+"""
 import os
 
 
@@ -29,6 +32,11 @@ def generate_chunks(path, size):
 
 
 def open_file(path):
+    """
+    Opens a file.
+    :param path: the file's path.
+    :return: open file.
+    """
     return open(path, 'wb')
 
 

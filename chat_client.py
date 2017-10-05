@@ -16,9 +16,14 @@ QUIT_MSG = '?quit'
 DL_DIR = 'client_dl'
 FILE_FIN_MSG = 'file: {} has finished downloading.'
 FILE_UP_START = 'Uploading file. please wait.'
+MAX_GUI_WAIT = 2
 
 
 def get_nick():
+    """
+    Asks the user for a nickname.
+    :return: nickname string.
+    """
     while True:
         nick = raw_input('Enter nickname: ')
         if NICKNAME_REG.match(nick):
@@ -40,14 +45,29 @@ class ChatClient(object):
                                             self.file_end, None)
 
     def exit(self):
+        """
+        Exists the server.
+        """
         self.client.send_regular_msg(QUIT_MSG)
 
     def close(self, **kwargs):
+        """
+        Closes the connection to the server.
+        """
         self.client.close_sock()
 
     def wait_for_gui(self):
+        """
+        Waits for the gui to initialize.
+        :return: True if GUI successfully initialized, False otherwise.
+        """
+        waited = 0
         while not self.gui.running:
+            if waited >= MAX_GUI_WAIT:
+                return False
             time.sleep(GUI_WAIT_TIME)
+            waited += GUI_WAIT_TIME
+        return True
 
     def request_file(self, name, **kwargs):
         """
@@ -94,6 +114,9 @@ class ChatClient(object):
             self.gui.display_message(message)
 
     def receive_messages(self):
+        """
+        Start receiving messages.
+        """
         while self.client.open:
             message = self.client.receive_obj()
             if not message:
@@ -101,7 +124,13 @@ class ChatClient(object):
             self.protocols.initiate_protocol(message.header, msg=message)
 
     def initiate_conversation(self, nickname):
-        self.wait_for_gui()
+        """
+        Initiates conversation with the server.
+        :param nickname: the user's nickname.
+        """
+        if not self.wait_for_gui():
+            print 'GUI failed to initialize.'
+            return
         try:
             self.client.connect()
         except:

@@ -30,6 +30,9 @@ class Server(object):
                                             self.file_end, None)
 
     def _init_messages(self):
+        """
+        Initializes the server's messages.
+        """
         self.connect_message = '{} connected'
         self.disconnect_message = '{} disconnected.'
         self.invalid_nick_message = 'Nickname: {} is taken.'
@@ -65,6 +68,10 @@ class Server(object):
             self.handle_inputs(readable)
 
     def get_client_list(self):
+        """
+        Generates a list of the connected sockets.
+        :return: list of sockets.
+        """
         return self.users_by_client.keys()
 
     def handle_inputs(self, readable):
@@ -126,8 +133,8 @@ class Server(object):
     # Server logic
     def handle_client(self, user):
         """
-        Handles the chatsocket's needs.
-        :param user: the user to handle.
+        Handles a ready socket.
+        :param user: the user associated with the socket.
         """
         msg = user.client.receive_obj()
         if msg:
@@ -137,6 +144,11 @@ class Server(object):
             self.broadcast(self.disconnect_message.format(user.display_name))
 
     def handle_command(self, msg, user):
+        """
+        Handles a command message.
+        :param msg: the message.
+        :param user: the user who sent the message.
+        """
         command = commands.Command.parse_msg(msg)
         if command:
             if self.check_permission(user, command):
@@ -254,6 +266,9 @@ class Server(object):
 
 
 def main():
+    """
+    The main function.
+    """
     s = Server()
     s.start_server()
     s.server.close_sock()

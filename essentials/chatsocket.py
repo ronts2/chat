@@ -47,6 +47,9 @@ class ChatSocket(socket.socket):
         self.open = False
 
     def connect(self):
+        """
+        Connects to the server.
+        """
         super(ChatSocket, self).connect((self.server_ip, self.port))
         self.open = True
 
