@@ -1,5 +1,5 @@
 """
-This module
+This module is used to work with files.
 """
 import os
 

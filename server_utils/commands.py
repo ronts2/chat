@@ -239,7 +239,7 @@ def demote(args_obj):
         target.client.send_regular_msg(server.demote_message)
 
 
-@Command.command('^send_file\ \S+\.\S+$', admin_only=True)
+@Command.command('^send_file\ \S+\.\S+$')
 def send_file(args_obj):
     """
     Downloads a file.

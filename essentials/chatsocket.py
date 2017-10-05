@@ -14,7 +14,7 @@ import protocols
 MSG_LEN_SIZE = 10  # The size of the length of a message
 # the default server port - the host's choice
 DEF_SERVER_PORT = 9900
-DEF_DATA_CHUNK_SIZE = 1048576
+DEF_DATA_CHUNK_SIZE = 524288
 DEF_LISTEN = 5
 CHUNK_SEND_WAIT = 1
 
@@ -64,7 +64,7 @@ class ChatSocket(socket.socket):
         :return: client socket and address as returned by the socket.accept method.
         """
         sock, address = super(ChatSocket, self).accept()
-        return ChatSocket(_sock=sock), address
+        return ChatSocket(server_ip=self.server_ip, _sock=sock), address
 
     def receive(self):
         """

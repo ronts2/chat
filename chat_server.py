@@ -3,6 +3,7 @@ This module contains the server (main script for the server host).
 The server follows the communication protocol: send size of data - then the data itself.
 """
 import select
+from threading import Thread, Lock
 
 from essentials import file_handler, protocols, chatsocket
 from server_utils import commands, user
@@ -21,6 +22,7 @@ class Server(object):
         """
         The class constructor.
         """
+        self.lock = Lock()
         self.server = chatsocket.ChatSocket(server_ip=IP)
         self.users_by_nick = dict()
         self.users_by_client = dict()
@@ -85,7 +87,11 @@ class Server(object):
                 if len(self.users_by_nick) < MAX_CONNECTIONS:
                     self.accept_new_user(sock)
             else:
-                self.handle_client(self.users_by_client[sock])
+                user = self.users_by_client[sock]
+                if self.open_files[user]:
+                    Thread(target=self.handle_client, args=[user]).start()
+                else:
+                    self.handle_client(user)
 
     def accept_new_user(self, sock):
         """
@@ -120,7 +126,7 @@ class Server(object):
         user.connected = True
         self.users_by_nick[user.nickname] = user
         self.users_by_client[user.client] = user
-        self.open_files[user.nickname] = None
+        self.open_files[user] = None
 
     def remove_user(self, user):
         """
@@ -129,7 +135,7 @@ class Server(object):
         """
         del self.users_by_nick[user.nickname]
         del self.users_by_client[user.client]
-        del self.open_files[user.nickname]
+        del self.open_files[user]
 
     # Server logic
     def handle_client(self, user):
@@ -217,7 +223,9 @@ class Server(object):
         :param user: the user who sent the file chunk.
         :param msg: the message.
         """
+        self.lock.acquire()
         self.open_files[user].write(msg.data)
+        self.lock.release()
 
     def file_end(self, name, user, msg):
         """

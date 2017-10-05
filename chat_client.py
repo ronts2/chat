@@ -81,7 +81,7 @@ class ChatClient(object):
         Handles an upload-finished message.
         :param name: the file's name.
         """
-        #self.gui.enable_input()
+        self.gui.enable_input()
 
     def send_file(self, path, **kwargs):
         """
@@ -91,7 +91,7 @@ class ChatClient(object):
         if not file_handler.PATH_EXISTS(path):
             self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
         else:
-            #self.gui.disable_input()
+            self.gui.disable_input()
             self.gui.display_message(FILE_UP_START)
             self.client.send_file(path)
 
@@ -156,6 +156,9 @@ class ChatClient(object):
 
 
 def main():
+    """
+    The main function.
+    """
     chat_client = ChatClient()
     chat_client.start_client()
 
