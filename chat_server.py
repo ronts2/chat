@@ -7,6 +7,7 @@ import select
 from essentials import file_handler, protocols, chatsocket
 from server_utils import commands, user
 
+IP = '0.0.0.0'
 DL_DIR = 'dl'
 MAX_CONNECTIONS = 5
 
@@ -20,7 +21,7 @@ class Server(object):
         """
         The class constructor.
         """
-        self.server = chatsocket.ChatSocket()
+        self.server = chatsocket.ChatSocket(server_ip=IP)
         self.users_by_nick = dict()
         self.users_by_client = dict()
         self.open_files = dict()
@@ -107,7 +108,7 @@ class Server(object):
         """
         self.add_user(user)
         # The host is the owner (Admin) of the server
-        if user.address == self.server.server_ip or len(self.users_by_nick) == 1:
+        if len(self.users_by_nick) == 1 or user.address == self.server.server_ip:
             commands.promote(commands.CommandArgs(self, user, ''))
         self.broadcast(self.connect_message.format(user.display_name))
 

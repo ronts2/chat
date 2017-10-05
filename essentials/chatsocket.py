@@ -12,8 +12,6 @@ import messages
 import protocols
 
 MSG_LEN_SIZE = 10  # The size of the length of a message
-# the default server ip address - the current computer
-DEF_SERVER_IP = '0.0.0.0'
 # the default server port - the host's choice
 DEF_SERVER_PORT = 9900
 DEF_DATA_CHUNK_SIZE = 1048576
@@ -26,7 +24,7 @@ class ChatSocket(socket.socket):
     The chat socket follows the communication protocol: send size of data - then the data itself
     The chat socket contains the chat socket socket and the server's info
     """
-    def __init__(self, server_ip=DEF_SERVER_IP, port=DEF_SERVER_PORT, msg_len_size=MSG_LEN_SIZE,
+    def __init__(self, server_ip, port=DEF_SERVER_PORT, msg_len_size=MSG_LEN_SIZE,
                  data_chunk_size=DEF_DATA_CHUNK_SIZE, listen=DEF_LISTEN, _sock=None):
         """
         The class constructor.
