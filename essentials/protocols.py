@@ -49,11 +49,11 @@ class Protocol(object):
         :param kwargs: additional arguments to pass.
         """
         components = header.split(':')
-        protocol, data = components[0], filter(None, components[1:])
+        protocol, data = components[0], ':'.join(filter(None, components[1:]))
         func = self.protocols[protocol]
         if not func:
             print protocol
         if not data:
             func(**kwargs)
         else:
-            func(*data, **kwargs)
+            func(data, **kwargs)

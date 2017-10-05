@@ -185,6 +185,14 @@ class Server(object):
         self.broadcast(self.file_not_found_msg.format(name))
 
     def file_start(self, name, user, msg):
+        """
+        Handles a file-start message.
+        :param name: the file's name
+        :param user: the user who sent the message.
+        :param msg: the message.
+        """
+        self.broadcast(self.upload_start_msg.format(name))
+        user.uploading = True
         name = file_handler.get_location(DL_DIR, name)
         file_handler.create_file(name)
         self.open_files[user] = file_handler.open_file(name)

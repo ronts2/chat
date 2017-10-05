@@ -231,8 +231,9 @@ def demote(args_obj):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.is_admin:
-        if len([user for nick, user in server.users_by_nick if user.is_admin]) == 1:
-            server.broadcast()
+        if len([user for nick, user in server.users_by_nick.iteritems() if user.is_admin]) == 1:
+            server.broadcast(server.min_admin_msg)
+            return
         server.change_display_name(target, target.display_name[1:])
         target.is_admin = False
         target.client.send_regular_msg(server.demote_message)
@@ -248,8 +249,6 @@ def send_file(args_obj):
     if user.uploading:
         user.client.send_regular_msg(server.already_uploading_msg)
         return
-    user.uploading = True
     name = args_obj.args[1]
     request = protocols.build_header(protocols.REQUEST_FILE, name)
     user.client.send_msg(request, '')
-    server.broadcast(server.upload_start_msg.format(name))
