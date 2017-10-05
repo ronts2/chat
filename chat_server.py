@@ -39,6 +39,7 @@ class Server(object):
         self.kick_message_all = 'User {} was kicked from the server.'
         self.mute_message = "You've been muted. you can no longer send messages, but you can still view the chat."
         self.muted_message = 'You cannot send messages or run commands while you are muted.'
+        self.min_admin_msg = 'There must be at least 1 admin(s) present on the server at any time.'
         self.unmute_message = 'You are no longer muted.'
         self.commands_message = 'Allowed commands: {}'
         self.admins_message = 'Admins: {}'
@@ -99,7 +100,7 @@ class Server(object):
         """
         self.add_user(user)
         # The host is the owner (Admin) of the server
-        if user.address == self.server.server_ip:
+        if user.address == self.server.server_ip or len(self.users_by_nick) == 1:
             commands.promote(commands.CommandArgs(self, user, ''))
         self.broadcast(self.connect_message.format(user.display_name))
 

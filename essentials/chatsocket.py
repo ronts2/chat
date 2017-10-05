@@ -18,9 +18,7 @@ DEF_SERVER_IP = socket.gethostbyname(socket.gethostname())
 DEF_SERVER_PORT = 9900
 DEF_DATA_CHUNK_SIZE = 1048576
 DEF_LISTEN = 5
-
-
-CHUNK_SEND_WAIT = 0.1
+CHUNK_SEND_WAIT = 1
 
 
 class ChatSocket(socket.socket):

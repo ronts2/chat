@@ -231,6 +231,8 @@ def demote(args_obj):
         user.client.send_regular_msg(server.user_not_found.format(target))
         return
     if target.is_admin:
+        if len([user for nick, user in server.users_by_nick if user.is_admin]) == 1:
+            server.broadcast()
         server.change_display_name(target, target.display_name[1:])
         target.is_admin = False
         target.client.send_regular_msg(server.demote_message)

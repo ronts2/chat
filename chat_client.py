@@ -34,7 +34,7 @@ class ChatClient(object):
         """
         The class constructor.
         """
-        self.client = chatsocket.ChatSocket()
+        self.client = chatsocket.ChatSocket(server_ip='109.66.138.185')
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.close, self.send_file, None, None, None,
                                             self.file_end, None)
 
@@ -60,7 +60,7 @@ class ChatClient(object):
         Handles an upload-finished message.
         :param name: the file's name.
         """
-        self.gui.enable_input()
+        #self.gui.enable_input()
 
     def send_file(self, path, **kwargs):
         """
@@ -70,7 +70,7 @@ class ChatClient(object):
         if not file_handler.PATH_EXISTS(path):
             self.client.send_msg(protocols.build_header(protocols.FILE_NOT_FOUND, path), '')
         else:
-            self.gui.disable_input()
+            #self.gui.disable_input()
             self.gui.display_message(FILE_UP_START)
             self.client.send_file(path)
 
