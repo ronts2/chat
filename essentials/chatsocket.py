@@ -145,9 +145,10 @@ class ChatSocket(socket.socket):
         """
         self.send_msg(protocols.build_header(protocols.FILE_START, path), '')
         for chunk in chunks:
-            self.send_msg(protocols.build_header(protocols.FILE_CHUNK, path), chunk)
-            sleep(CHUNK_SEND_WAIT)
-        self.send_msg(protocols.build_header(protocols.FILE_END, path), '')
+            if chunk:
+                self.send_str(chunk)
+                sleep(CHUNK_SEND_WAIT)
+        self.send_str(protocols.FILE_END)
 
     def send_file(self, path):
         """

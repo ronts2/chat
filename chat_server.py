@@ -29,8 +29,8 @@ class Server(object):
         self.open_files = dict()
         self._init_messages()
         self.protocols = protocols.Protocol(self.handle_regular_msg, self.disconnect_user, None,
-                                            self.file_not_found, self.file_start, self.process_file_chunk,
-                                            self.file_end, None)
+                                            self.file_not_found, self.file_start, None,
+                                            None, None)
 
     def _init_messages(self):
         """
@@ -89,7 +89,7 @@ class Server(object):
             else:
                 user = self.users_by_client[sock]
                 if self.open_files[user]:
-                    Thread(target=self.handle_client, args=[user]).start()
+                    Thread(target=self.process_file_chunk, args=[user, sock.receive()]).start()
                 else:
                     self.handle_client(user)
 
@@ -216,29 +216,30 @@ class Server(object):
         file_handler.create_file(name)
         self.open_files[user] = file_handler.open_file(name)
 
-    def process_file_chunk(self, name, user, msg):
+    def process_file_chunk(self, user, data):
         """
         Adds the file chunk data to the downloaded file data.
-        :param name: the file's name.
         :param user: the user who sent the file chunk.
-        :param msg: the message.
+        :param data: the chunk data.
         """
         self.lock.acquire()
-        self.open_files[user].write(msg.data)
+        if data == protocols.FILE_END:
+            self.file_end(file_handler.GET_FILE_NAME(self.open_files[user].name), user)
+            return
+        self.open_files[user].write(data)
         self.lock.release()
 
-    def file_end(self, name, user, msg):
+    def file_end(self, name, user):
         """
         Handles a file-end protocol.
         :param name: the file's name.
         :param user: the user who sent the file.
-        :param msg: the 'file end' message.
         """
+        user.uploading = False
         self.open_files[user].close()
         self.open_files[user] = None
         self.broadcast(self.upload_finished_msg.format(name))
         user.client.send_msg(protocols.build_header(protocols.FILE_END, name), '')
-        user.uploading = False
 
     def change_display_name(self, user, new_nick):
         """
